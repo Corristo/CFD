@@ -46,20 +46,17 @@ void calculate_fg(
     double dy_v2 = 0.0;
     double dx_uv = 0.0;
 
-    for (i = 0; i <= imax; i++)
+    for (i = 0; i < imax; i++)
     {
-        for (j = 0; j <= jmax; j++)
+        for (j = 1; j <= jmax; j++)
         {
-            if ((i == 0) || (i == imax))
+            if (i == 0)
             {
                 F[i][j] = U[i][j];
+                F[imax][j] = U[i][j];
 
             }
-            if ((j == 0) || (j == jmax))
-            {
-                G[i][j] = V[i][j];
-            }
-            if (i > 0 && i < imax && j > 0 && j <= jmax)
+            else
             {
                 discrLaplU = 1./(dx*dx) * (U[i+1][j] - 2*U[i][j] + U[i-1][j]) +
                              1./(dy*dy) * (U[i][j+1] - 2*U[i][j] + U[i][j-1]);
@@ -69,7 +66,18 @@ void calculate_fg(
                         + alpha/(4.0*dy) * (fabs(V[i][j]+V[i+1][j])*(U[i][j]-U[i][j+1]) - fabs(V[i][j-1]+V[i+1][j-1])*(U[i][j-1]-U[i][j]));
                 F[i][j] = U[i][j] + dt*(1./Re * discrLaplU - dx_u2 - dy_uv + GX);
             }
-            if (i > 0 && i <= imax && j > 0 && j < jmax)
+        }
+    }
+    for (i = 1; i <= imax; i++)
+    {
+        for (j = 0; j < jmax; j++)
+        {
+            if (j == 0)
+            {
+                G[i][0] = V[i][0];
+                G[i][jmax] = V[i][jmax];
+            }
+            else
             {
                 discrLaplV = 1./(dx*dx) * (V[i+1][j] - 2*V[i][j] + V[i-1][j]) +
                              1./(dy * dy) * (V[i][j+1] - 2*V[i][j] + V[i][j-1]);
@@ -80,7 +88,6 @@ void calculate_fg(
                         alpha/(4.0*dx) * (fabs(U[i][j]+U[i][j+1])*(V[i][j]-V[i+1][j]) - fabs(U[i-1][j]+U[i-1][j+1])*(V[i-1][j]-V[i][j]));
                 G[i][j] = V[i][j] + dt*(1./Re * discrLaplV - dx_uv - dy_v2 + GY);
             }
-
         }
     }
 }
