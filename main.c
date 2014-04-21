@@ -6,7 +6,7 @@
 #include "boundary_val.h"
 #include <stdio.h>
 #include <time.h>
-
+#include <stdbool.h>
 
 /**
  * The main operation reads the configuration file, initializes the scenario and
@@ -46,7 +46,9 @@ int main(int argn, char** args)
     double **U, **V, **P, **R, **F, **G;
     double t = 0.0;
     double t_end, xlength, ylength, tau, omg, alpha, eps, Re, GX, GY, PI, UI, VI, dx, dy, dt, res, dt_value;
-    int n, imax, jmax, itermax, it, i;
+    int n, imax, jmax, itermax, it, i, outputCount;
+    double nextOutput;
+    bool outputSpecified = false;
 
     char* paraviewOutput = "./Paraview/cavity100";
     char* inputFile = "./cavity100.dat";
@@ -64,18 +66,33 @@ int main(int argn, char** args)
     begin = clock();
 
     /* Parse command line arguments */
-    for (i = 1; i < argn; i++)
+    if (argn > 2)
     {
-        if (strcmp(args[i], "-i") == 0)
-            inputFile = args[i + 1];
+        for (i = 1; i < argn; i++)
+        {
+            if (strcmp(args[i], "-i") == 0)
+            {
+                inputFile = args[i + 1];
+                if (!outputSpecified)
+                    paraviewOutput = "./Paraview/sim";
+            }
 
-        if (strcmp(args[i], "-o") == 0)
-            paraviewOutput = args[i + 1];
+            if (strcmp(args[i], "-o") == 0)
+            {
+                paraviewOutput = args[i + 1];
+                outputSpecified = true;
+            }
 
 
+        }
+    }
+    else if (argn == 2)
+    {
+        /* input file is the single argument besides fctn-name */
+        inputFile = args[1];
     }
 
-     /* Initialization */
+    /* Initialization */
     read_parameters(inputFile, &Re, &UI, &VI, &PI, &GX, &GY, &t_end, &xlength, &ylength, &dt, &dx, &dy, &imax, &jmax, &alpha, &omg, &tau, &itermax, &eps, &dt_value);
     U = matrix(0, imax, 0, jmax + 1);
     V = matrix(0, imax + 1, 0, jmax);
@@ -84,12 +101,14 @@ int main(int argn, char** args)
     F = matrix(0, imax, 0, jmax);
     G = matrix(0, imax, 0, jmax);
     n = 0;
+    nextOutput = dt_value;
+
 
     init_uvp(UI, VI, PI, imax, jmax, U, V, P);
     minIter = itermax;
     minTimeStep = t_end;
-
-
+    write_vtkFile(paraviewOutput,0,xlength,ylength,imax,jmax,dx,dy,U,V,P);
+    outputCount = 1;
     while (t < t_end)
     {
         calculate_dt(Re, tau, &dt, dx, dy, imax, jmax, U, V);
@@ -116,8 +135,14 @@ int main(int argn, char** args)
         sumIter += it;
         calculate_uv(dt, dx, dy, imax, jmax, U, V, F, G, P);
         t = t + dt;
-        write_vtkFile(paraviewOutput,n,xlength,ylength,imax,jmax,dx,dy,U,V,P);
         n++;
+        if (t > nextOutput)
+        {
+            write_vtkFile(paraviewOutput,outputCount,xlength,ylength,imax,jmax,dx,dy,U,V,P);
+            nextOutput += dt_value;
+            outputCount++;
+        }
+
     }
     end = clock();
     time_spent = (double) (end - begin) / CLOCKS_PER_SEC;
@@ -139,3 +164,4 @@ int main(int argn, char** args)
 
     return 0;
 }
+

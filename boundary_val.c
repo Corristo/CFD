@@ -33,20 +33,9 @@ void boundaryvalues(
 
             if ((j == jmax) && (i >0))
             {
-                U[i][jmax + 1] = 2.0-U[i][jmax];
+                U[i][jmax + 1] = 2.0 - U[i][jmax];
                 V[i][jmax] = 0;
             }
         }
     }
-
-    /* Cosmetics for a nicer structure of the matrices */
-    /* The values set here are never accessed */
-    U[0][0] = 0;
-    U[imax][0] = 0;
-    U[imax][jmax + 1] = 2.0;
-    U[0][jmax + 1] = 0.0;
-    V[0][0] = 0;
-    V[imax + 1][0] = 0;
-    V[imax + 1][jmax] = 0;
-    V[0][jmax] = 0;
 }
