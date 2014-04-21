@@ -136,7 +136,7 @@ int main(int argn, char** args)
         calculate_uv(dt, dx, dy, imax, jmax, U, V, F, G, P);
         t = t + dt;
         n++;
-        if (t > nextOutput)
+        if (t >= nextOutput)
         {
             write_vtkFile(paraviewOutput,outputCount,xlength,ylength,imax,jmax,dx,dy,U,V,P);
             nextOutput += dt_value;
