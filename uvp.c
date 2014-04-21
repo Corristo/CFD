@@ -53,7 +53,7 @@ void calculate_fg(
             if (i == 0)
             {
                 F[i][j] = U[i][j];
-                F[imax][j] = U[i][j];
+                F[imax][j] = U[imax][j];
 
             }
             else
