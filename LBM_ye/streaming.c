@@ -1,5 +1,6 @@
 #include "streaming.h"
 #include "LBDefinitions.h"
+#include <math.h>
 
 void doStreaming(double *collideField, double *streamField,int *flagField,int xlength){
   int x, y, z, i;
@@ -10,8 +11,8 @@ void doStreaming(double *collideField, double *streamField,int *flagField,int xl
   		for( x = 1; x < xlength + 1; x++ )
   			for( i = 0; i < 19; i++ ){
   				streamField[ 19 * (z * dim_pow2 + y * dim + x) + i ] = 
-  				 collideField[ 19 * ( (z + LATTICEVELOCITIES[i][2]) * 
-  				 	                 dim_pow2 + (y + LATTICEVELOCITIES[i][1]) * dim + x + LATTICEVELOCITIES[i][0]) + i ];
+  				    collideField[ 19 * ( (z - LATTICEVELOCITIES[i][2]) * 
+  				 	                 dim_pow2 + (y - LATTICEVELOCITIES[i][1]) * dim + x - LATTICEVELOCITIES[i][0]) + i ];
   			}
 
 }

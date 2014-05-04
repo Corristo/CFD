@@ -5,7 +5,7 @@ void computeDensity(const double *const currentCell, double *density){
   int i;
   *density = 0.0;
 
-  for(i = 0; i < 19; i++) *density = *density + currentCell[i];
+  for(i = 0; i < 19; i++) (*density) = (*density) + currentCell[i];
 
 }
 

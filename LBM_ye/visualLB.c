@@ -25,20 +25,22 @@ void writeVtkOutput(const double * const collideField, const int * const flagFie
   write_vtkPointCoordinates(fp, xlength );
 
   fprintf(fp,"POINT_DATA %i \n", xlength * xlength * xlength );
-	
+
+
   fprintf(fp,"\n");
   fprintf(fp, "VECTORS velocity float\n");
   for(k = 1; k < xlength+1; k++)
 	  for(j = 1; j < xlength+1; j++) {
 	     for(i = 1; i < xlength+1; i++) {
-	     	index = k*dim_pow2 + j*dim + i;
-	     	computeDensity( &collideField[index], &density[i-1][j-1][k-1] );
-	     	computeVelocity(&collideField[index], &density[i-1][j-1][k-1], velocity);
+	     	index = 19 * (k*dim_pow2 + j*dim + i);
+	     	computeDensity(&collideField[index], &density[i-1][j-1][k-1] );
+	     	computeVelocity(&collideField[index], &density[i-1][j-1][k-1], velocity);	
+
 	        fprintf(fp, "%f %f %f\n", velocity[0], velocity[1], velocity[2] );
 	     }
   }
 
-/*  fprintf(fp,"\n");
+  fprintf(fp,"\n");
   fprintf(fp,"CELL_DATA %i \n", xlength * xlength * xlength );
   fprintf(fp, "SCALARS density float 1 \n"); 
   fprintf(fp, "LOOKUP_TABLE default \n");
@@ -47,7 +49,7 @@ void writeVtkOutput(const double * const collideField, const int * const flagFie
 	    for(i = 0; i < xlength; i++) {
 	      fprintf(fp, "%f\n", density[i][j][k] );
 	    }
-  }*/
+  }
 
   if( fclose(fp) )
   {

@@ -435,7 +435,7 @@ void treatBoundary(double *collideField, int* flagField, const double * const wa
 
  				index = (dim - 1 + LATTICEVELOCITIES[i][2]) * dim_pow2 + (y + LATTICEVELOCITIES[i][1]) * dim + x + LATTICEVELOCITIES[i][0];
 
- 				computeDensity(&(collideField[index]), &density);
+ 				computeDensity(&(collideField[19 * index]), &density);
 
  				collideField[ 19 * (xlen_pow3 + y * dim + x) + i] = collideField[19 * index + 18 - i] + 2 * LATTICEWEIGHTS[i] * density * val[i];
  			}
@@ -446,7 +446,7 @@ void treatBoundary(double *collideField, int* flagField, const double * const wa
 
  				index = (dim - 1 + LATTICEVELOCITIES[i][2]) * dim_pow2 + (1 + LATTICEVELOCITIES[i][1]) * dim + x + LATTICEVELOCITIES[i][0];
 
- 				computeDensity(&(collideField[index]), &density);
+ 				computeDensity(&(collideField[19*index]), &density);
 
  				collideField[ 19 * (xlen_pow3 + dim + x) + i] = collideField[19 * index + 18 - i] + 2 * LATTICEWEIGHTS[i] * density * val[i];
  			}
@@ -456,7 +456,7 @@ void treatBoundary(double *collideField, int* flagField, const double * const wa
 
  				index = (dim - 1 + LATTICEVELOCITIES[4][2]) * dim_pow2 + LATTICEVELOCITIES[4][1] * dim + x + LATTICEVELOCITIES[4][0];
 
- 				computeDensity(&(collideField[index]), &density);
+ 				computeDensity(&(collideField[19*index]), &density);
 
  				collideField[ 19 * (xlen_pow3 + x) + 4] = collideField[19 * index + 14] + 2 * LATTICEWEIGHTS[4] * density * val[4];
  			}
@@ -467,7 +467,7 @@ void treatBoundary(double *collideField, int* flagField, const double * const wa
 
  				index = (dim - 1 + LATTICEVELOCITIES[i][2]) * dim_pow2 + (xlength + LATTICEVELOCITIES[i][1]) * dim + x + LATTICEVELOCITIES[i][0];
 
- 				computeDensity(&(collideField[index]), &density);
+ 				computeDensity(&(collideField[19*index]), &density);
 
  				collideField[ 19 * (xlen_pow3 + xlength * dim + x) + i] = collideField[19 * index + 18 - i] + 2 * LATTICEWEIGHTS[i] * density * val[i];
  			}
@@ -477,7 +477,7 @@ void treatBoundary(double *collideField, int* flagField, const double * const wa
 
  				index = (dim - 1 + LATTICEVELOCITIES[0][2]) * dim_pow2 + (xlength + 1 + LATTICEVELOCITIES[0][1]) * dim + x + LATTICEVELOCITIES[0][0];
 
- 				computeDensity(&(collideField[index]), &density);
+ 				computeDensity(&(collideField[19*index]), &density);
 
  				collideField[ 19 * (xlen_pow3 + (xlength + 1) * dim + x)] = collideField[19 * index + 18] + 2 * LATTICEWEIGHTS[0] * density * val[0];
  			}
@@ -489,7 +489,7 @@ void treatBoundary(double *collideField, int* flagField, const double * const wa
 
 			index = (dim - 1 + LATTICEVELOCITIES[i][2]) * dim_pow2 + (y + LATTICEVELOCITIES[i][1]) * dim + 1 + LATTICEVELOCITIES[i][0];
 
-			computeDensity(&(collideField[index]), &density);
+			computeDensity(&(collideField[19*index]), &density);
 
 			collideField[ 19 * (xlen_pow3 + y * dim + 1) + i] = collideField[19 * index + 18 - i] + 2 * LATTICEWEIGHTS[i] * density * val[i];
 		    }
@@ -499,7 +499,7 @@ void treatBoundary(double *collideField, int* flagField, const double * const wa
 
 			index = (dim - 1 + LATTICEVELOCITIES[3][2]) * dim_pow2 + (y + LATTICEVELOCITIES[3][1]) * dim + LATTICEVELOCITIES[3][0];
 
-			computeDensity(&(collideField[index]), &density);
+			computeDensity(&(collideField[19*index]), &density);
 
 			collideField[ 19 * (xlen_pow3 + y * dim) + 3] = collideField[19 * index + 15] + 2 * LATTICEWEIGHTS[3] * density * val[3];
 			}
@@ -511,7 +511,7 @@ void treatBoundary(double *collideField, int* flagField, const double * const wa
 
 			index = (dim - 1 + LATTICEVELOCITIES[i][2]) * dim_pow2 + (y + LATTICEVELOCITIES[i][1]) * dim + xlength + LATTICEVELOCITIES[i][0];
 
-			computeDensity(&(collideField[index]), &density);
+			computeDensity(&(collideField[19*index]), &density);
 
 			collideField[ 19 * (xlen_pow3 + y * dim + xlength) + i] = collideField[19 * index + 18 - i] + 2 * LATTICEWEIGHTS[i] * density * val[i];
 			}
@@ -521,7 +521,7 @@ void treatBoundary(double *collideField, int* flagField, const double * const wa
 
 			index = (dim - 1 + LATTICEVELOCITIES[1][2]) * dim_pow2 + (y + LATTICEVELOCITIES[1][1]) * dim + xlength + 1 + LATTICEVELOCITIES[1][0];
 
-			computeDensity(&(collideField[index]), &density);
+			computeDensity(&(collideField[19*index]), &density);
 
 			collideField[ 19 * (xlen_pow3 + y * dim + xlength + 1) + 1] = collideField[19 * index + 17] + 2 * LATTICEWEIGHTS[1] * density * val[1];
 		}
@@ -532,7 +532,7 @@ void treatBoundary(double *collideField, int* flagField, const double * const wa
 
 		index = (dim - 1 + LATTICEVELOCITIES[i][2]) * dim_pow2 + (1 + LATTICEVELOCITIES[i][1]) * dim + 1 + LATTICEVELOCITIES[i][0];
 
-		computeDensity(&(collideField[index]), &density);
+		computeDensity(&(collideField[19*index]), &density);
 
 		collideField[ 19 * (xlen_pow3 + dim + 1) + i] = collideField[19 * index + 18 - i] + 2 * LATTICEWEIGHTS[i] * density * val[i];
 	}	
@@ -542,7 +542,7 @@ void treatBoundary(double *collideField, int* flagField, const double * const wa
 
 		index = (dim - 1 + LATTICEVELOCITIES[i][2]) * dim_pow2 + (xlength + LATTICEVELOCITIES[i][1]) * dim + 1 + LATTICEVELOCITIES[i][0];
 
-		computeDensity(&(collideField[index]), &density);
+		computeDensity(&(collideField[19*index]), &density);
 
 		collideField[ 19 * (xlen_pow3 + xlength * dim + 1) + i] = collideField[19 * index + 18 - i] + 2 * LATTICEWEIGHTS[i] * density * val[i];
 		}
@@ -552,7 +552,7 @@ void treatBoundary(double *collideField, int* flagField, const double * const wa
 
 		index = (dim - 1 + LATTICEVELOCITIES[i][2]) * dim_pow2 + (1 + LATTICEVELOCITIES[i][1]) * dim + xlength + LATTICEVELOCITIES[i][0];
 
-		computeDensity(&(collideField[index]), &density);
+		computeDensity(&(collideField[19*index]), &density);
 
 		collideField[ 19 * (xlen_pow3 + dim + xlength) + i] = collideField[19 * index + 18 - i] + 2 * LATTICEWEIGHTS[i] * density * val[i];
 		}
@@ -561,7 +561,7 @@ void treatBoundary(double *collideField, int* flagField, const double * const wa
 
 		index = (dim - 1 + LATTICEVELOCITIES[i][2]) * dim_pow2 + (xlength + LATTICEVELOCITIES[i][1]) * dim + xlength + LATTICEVELOCITIES[i][0];
 
-		computeDensity(&(collideField[index]), &density);
+		computeDensity(&(collideField[19*index]), &density);
 
 		collideField[ 19 * (xlen_pow3 + xlength * dim + xlength) + i] = collideField[19 * index + 18 - i] + 2 * LATTICEWEIGHTS[i] * density * val[i];
 	}
