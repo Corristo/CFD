@@ -21,9 +21,9 @@ void treatBoundary(double *collideField, int* flagField, const double * const wa
                     if (flagField[neighbourCoordX + (xlength + 2) * neighbourCoordY + (xlength + 2) * (xlength + 2) * neighbourCoordZ] == 0)
                     {
                         double density = 0.0;
-                        computeDensity(collideField + PARAMQ * (neighbourCoordZ * (xlength + 2) * (xlength + 2) + neighbourCoordY * (xlength + 2) + neighbourCoordX), &density);
+                        computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength + 2) * (xlength + 2) + neighbourCoordY * (xlength + 2) + neighbourCoordX), &density);
                         collideField[currentCellIndex] =  collideField[neighbourCellIndex]
-                                                          + 2 * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                                                          + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
                     }
             }
     /* back boundary */

@@ -26,7 +26,7 @@ void doCollision(double *collideField, int *flagField,const double * const tau,i
                 currentCell = collideField + PARAMQ * (z * (xlength + 2) * (xlength + 2) + y * (xlength + 2) + x);
                 density = 0.0;
              //   computeDensity(currentCell, &density);
-                computeDensity(currentCell, &density);
+                computeDensitySSE(currentCell, &density);
           /*      if (fabs(density - density2) > 0.0000001)
                 {
                     fprintf(stderr, "New density fn does not work correctly\n density old: %.3f\n density new: %.3f\n", density, density);
@@ -35,7 +35,7 @@ void doCollision(double *collideField, int *flagField,const double * const tau,i
            /*     if (__builtin_expect(fabs(1.0 - density) > 0.05, 0))
                     fprintf(stderr, "WARNING: Density is %.3f in cell (%d, %d, %d)\n", density, x, y, z); */
              //   computeVelocity(currentCell, &density, velocity2);
-                computeVelocity(currentCell, &density, velocity);
+                computeVelocitySSE(currentCell, &density, velocity);
              /*  if (fabs(velocity[0] - velocity2[0]) > 0.000001)
                 {
                     fprintf(stderr, "New velocity fn does not work correctly\n Velocity old: %.3f\n Velocity new: %.3f\n", velocity[0], velocity2[0]);
