@@ -44,7 +44,7 @@ int main(int argc, char *argv[]){
 
     writeVtkOutput(collideField, flagField, argv[1], -1, xlength);
     for(t = 0; t < timesteps; t++){
-    	time(&now);
+    	
 	    swap = NULL;
 	    doStreaming(collideField, streamField, flagField, xlength);
 	    swap = collideField;
@@ -52,16 +52,16 @@ int main(int argc, char *argv[]){
 	    streamField = swap;
 
 	    doCollision(collideField, flagField, &tau, xlength);
-	    treatBoundary(collideField, flagField, velocityWall, xlength);
-	    time(&later);
-	    seconds = seconds + difftime(later,now);
+	    treatBoundary(collideField, flagField, velocityWall, xlength);time(&now);
+	    
+	    time(&later);seconds = seconds + difftime(later,now);
 
 	    if(t % timestepsPerPlotting == 0){
 	    	writeVtkOutput(collideField, flagField, argv[1], t, xlength);
 	    }
 	} 
 
-	printf("The MLUPS for LB algorithm is: %f.\n", 50*50*50/(double)(seconds/timesteps)/(10e6));
+	printf("The MLUPS for LB algorithm is: %f.\n", 52*52*52/(double)(seconds/timesteps)/(10e6));
     		
     return 0;
 }
