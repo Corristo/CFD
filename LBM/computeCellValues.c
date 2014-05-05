@@ -6,13 +6,14 @@
 #include <emmintrin.h>
 #include <xmmintrin.h>
 
-/* void computeDensity(const double *const currentCell, double *density)
+ void computeDensity(const double *const currentCell, double *density)
 {
     *density = 0.0;
     for (int i = 0; i < PARAMQ; i++)
         *density += currentCell[i];
 }
- */
+
+
 void computeDensitySSE(const double * const currentCell, double *density)
 {
     __m128d vsum = _mm_set1_pd(0.0);
@@ -30,7 +31,7 @@ void computeDensitySSE(const double * const currentCell, double *density)
     }
 }
 
-/*void computeVelocity(const double * const currentCell, const double * const density, double *velocity)
+void computeVelocity(const double * const currentCell, const double * const density, double *velocity)
 {
     velocity[0] = 0.0;
     velocity[1] = 0.0;
@@ -55,7 +56,7 @@ void computeDensitySSE(const double * const currentCell, double *density)
     velocity[2] = velocity[2] / (*density);
 
 }
-*/
+
 void computeVelocitySSE(const double * const currentCell, const double * const density, double *velocity)
 {
     __m128d v0, v1, v2;

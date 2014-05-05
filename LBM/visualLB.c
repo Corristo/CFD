@@ -37,7 +37,7 @@ void write_vtkPointCoordinates( FILE *fp, int xlength)
     for(z = 0; z <= xlength + 1; z++)
         for(y = 0; y <= xlength + 1; y++)
             for ( x = 0; x <= xlength + 1; x++)
-                fprintf(fp, "%f %f %f\n", originX+(double) x / (xlength + 1.), originY + (double) y / (xlength + 1.0),  originZ + (double) z / (xlength + 1.0));
+                fprintf(fp, "%f %f %f\n", originX+(double) x , originY + (double) y,  originZ + (double) z);
 
 
 }
@@ -74,8 +74,8 @@ void writeVtkOutput(const double * const collideField, const int * const flagFie
             {
                 /* TODO: Compute velocity, print velocity */
                 currentCellIndex = PARAMQ * (z * (xlength + 2) * (xlength + 2) + y * (xlength + 2) + x);
-                computeDensitySSE(collideField + currentCellIndex, &cellDensity);
-                computeVelocitySSE(collideField + currentCellIndex, &cellDensity, cellVelocity);
+                computeDensity(collideField + currentCellIndex, &cellDensity);
+                computeVelocity(collideField + currentCellIndex, &cellDensity, cellVelocity);
                 fprintf(fp, "%f %f %f\n", cellVelocity[0], cellVelocity[1], cellVelocity[2]);
             }
 
@@ -89,8 +89,17 @@ void writeVtkOutput(const double * const collideField, const int * const flagFie
             for (x = 0; x <= xlength + 1; x++)
             {
                 currentCellIndex = PARAMQ * (z * (xlength + 2) * (xlength + 2) + y * (xlength + 2) + x);
-                computeDensitySSE(collideField + currentCellIndex, &cellDensity);
+                computeDensity(collideField + currentCellIndex, &cellDensity);
                 fprintf(fp, "%f\n", cellDensity);
+            }
+
+    fprintf(fp, "SCALARS boundary float 1 \n");
+    fprintf(fp, "LOOKUP_TABLE default \n");
+    for(z = 0; z <= xlength + 1; z++)
+        for(y = 0; y <= xlength + 1; y++)
+            for (x = 0; x <= xlength + 1; x++)
+            {
+               fprintf(fp, "%f\n", (double) flagField[z * (xlength + 2) * (xlength + 2)  + y * (xlength + 2) + x]);
             }
 
 
