@@ -29,6 +29,8 @@ int main(int argc, char *argv[])
         flagField = (int *) malloc((size_t) sizeof (int) * (xlength + 2)*(xlength + 2)*(xlength + 2));
         initialiseFields(collideField, streamField, flagField, xlength);
 
+        writeVtkOutput(streamField, flagField, "./Paraview/output", 0, xlength);
+
         for(int t = 0; t < timesteps; t++)
         {
             double *swap = NULL;

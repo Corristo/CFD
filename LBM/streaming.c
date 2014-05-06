@@ -3,7 +3,6 @@
 
 void doStreaming(double *collideField, double *streamField,int *flagField,int xlength)
 {
-    /* TODO */
     int streamCellIndex, neighbourCellIndex;
     for (int z = 1; z <= xlength ; z++)
         for (int y = 1; y <= xlength ; y++)
