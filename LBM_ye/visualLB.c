@@ -24,7 +24,7 @@ void writeVtkOutput(const double * const collideField, const int * const flagFie
   write_vtkHeader( fp, xlength );
   write_vtkPointCoordinates(fp, xlength );
 
-  fprintf(fp,"POINT_DATA %i \n", xlength * xlength * xlength );
+  fprintf(fp,"POINT_DATA %i \n", xlength*xlength*xlength );
 
 
   fprintf(fp,"\n");
@@ -41,7 +41,7 @@ void writeVtkOutput(const double * const collideField, const int * const flagFie
   }
 
   fprintf(fp,"\n");
-  fprintf(fp,"CELL_DATA %i \n", xlength * xlength * xlength );
+  //fprintf(fp,"CELL_DATA %i \n", xlength * xlength * xlength );
   fprintf(fp, "SCALARS density float 1 \n"); 
   fprintf(fp, "LOOKUP_TABLE default \n");
   for(k = 0; k < xlength; k++ )

@@ -105,15 +105,20 @@ void treatBoundary(double *collideField, int* flagField, const double * const wa
  			           	                  (1 + LATTICEVELOCITIES[i][1]) * dim + 1 + LATTICEVELOCITIES[i][0]) + 18 - i];
  		    }
     // x = xlength, y = 1, z = 0, i = 15,16,18
- 	for( i = 15; i < 19; i++ ){
- 			if(i != 17 )
+ 	for( i = 15; i < 17; i++ ){
  			     collideField[ 19 * (dim + xlength) + i] = 
  			                 collideField[19 * (LATTICEVELOCITIES[i][2] * dim_pow2 + 
  			           	                  (1 + LATTICEVELOCITIES[i][1]) * dim + xlength + LATTICEVELOCITIES[i][0]) + 18 - i];
  	}
+ 	collideField[ 19 * (dim + xlength) + 18] = 
+ 			                 collideField[19 * (LATTICEVELOCITIES[18][2] * dim_pow2 + 
+ 			           	                  (1 + LATTICEVELOCITIES[18][1]) * dim + xlength + LATTICEVELOCITIES[18][0])];
+
  	// x = 1, y = xlength, z = 0, i = 14,16,17
- 	for( i = 14; i < 18; i++ ){
- 			if(i != 15)
+  	collideField[ 19 * (xlength * dim + 1) + 14] = 
+ 			                 collideField[19 * (LATTICEVELOCITIES[14][2] * dim_pow2 + 
+ 			           	                  (xlength + LATTICEVELOCITIES[14][1]) * dim + 1 + LATTICEVELOCITIES[14][0]) + 14];
+ 	for( i = 16; i < 18; i++ ){
  			     collideField[ 19 * (xlength * dim + 1) + i] = 
  			                 collideField[19 * (LATTICEVELOCITIES[i][2] * dim_pow2 + 
  			           	                  (xlength + LATTICEVELOCITIES[i][1]) * dim + 1 + LATTICEVELOCITIES[i][0]) + 18 - i];
@@ -141,18 +146,22 @@ void treatBoundary(double *collideField, int* flagField, const double * const wa
 
  	// y = 1, z = 2: xlength - 1, i = 3,10,13,17
 	for( z = 2; z < xlength; z++ ){
-		for( i = 0; i < 5; i++ )
-			if(i != 1)
-			collideField[ 19 * (z * dim_pow2 + dim) + Iindex[i] ] = collideField[ 19 * ( (z + LATTICEVELOCITIES[Iindex[i]][2]) * dim_pow2 + 
+		collideField[ 19 * (z * dim_pow2 + dim) + 3 ] = collideField[ 19 * ( (z + LATTICEVELOCITIES[3][2]) * dim_pow2 + 
+				                                          (1 + LATTICEVELOCITIES[3][1]) * dim + LATTICEVELOCITIES[3][0] ) + 15];
+		for( i = 2; i < 5; i++ )
+			  collideField[ 19 * (z * dim_pow2 + dim) + Iindex[i] ] = collideField[ 19 * ( (z + LATTICEVELOCITIES[Iindex[i]][2]) * dim_pow2 + 
 				                                          (1 + LATTICEVELOCITIES[Iindex[i]][1]) * dim + LATTICEVELOCITIES[Iindex[i]][0] ) + 18 - Iindex[i]];
+	        
     }    
 
     // y = xlength, z = 2: xlength - 1, i = 3,7,10,17
 	for( z = 2; z < xlength; z++ ){
-		for( i = 0; i < 5; i++ )
-			if(1 != 3)
+		for( i = 0; i < 3; i++ )
 			collideField[ 19 * (z * dim_pow2 + xlength * dim) + Iindex[i] ] = collideField[ 19 * ( (z + LATTICEVELOCITIES[Iindex[i]][2]) * dim_pow2 + 
 				                                          (xlength + LATTICEVELOCITIES[Iindex[i]][1]) * dim + LATTICEVELOCITIES[Iindex[i]][0] ) + 18 - Iindex[i]];
+
+		collideField[ 19 * (z * dim_pow2 + xlength * dim) + 17 ] = collideField[ 19 * ( (z + LATTICEVELOCITIES[17][2]) * dim_pow2 + 
+				                                          (xlength + LATTICEVELOCITIES[17][1]) * dim + LATTICEVELOCITIES[17][0] ) + 1];
     }
 
     // z = 1, y = 2:xlength-1, i = 7,10,13,17
@@ -174,14 +183,16 @@ void treatBoundary(double *collideField, int* flagField, const double * const wa
 			                                          (1 + LATTICEVELOCITIES[Iindex[i]][1]) * dim + LATTICEVELOCITIES[Iindex[i]][0] ) + 18 - Iindex[i]];
     }
     // y = xlength, z = 1, x = 0, i = 7,10,17
-	for( i = 0; i < 5; i++ )
-		if( i == 1 || i == 2 || i == 4){
+	for( i = 1; i < 3; i++ ){
 		    collideField[ 19 * (dim_pow2 + xlength * dim) + Iindex[i] ] = collideField[ 19 * ( (1 + LATTICEVELOCITIES[Iindex[i]][2]) * dim_pow2 + 
 			                                          (xlength + LATTICEVELOCITIES[Iindex[i]][1]) * dim + LATTICEVELOCITIES[Iindex[i]][0] ) + 18 - Iindex[i]];
 	    }
+    collideField[ 19 * (dim_pow2 + xlength * dim) + 17 ] = collideField[ 19 * ( (1 + LATTICEVELOCITIES[17][2]) * dim_pow2 + 
+			                                          (xlength + LATTICEVELOCITIES[17][1]) * dim + LATTICEVELOCITIES[17][0] ) + 1];
 	// z= xlength, y = 1, x = 0; i = 3,10,13
-	for( i = 0; i < 4; i++ )
-		if(i != 1){
+	collideField[ 19 * (xlength * dim_pow2 + dim) + 3 ] = collideField[ 19 * ( (xlength + LATTICEVELOCITIES[3][2]) * dim_pow2 + 
+			                                          (1 + LATTICEVELOCITIES[3][1]) * dim + LATTICEVELOCITIES[3][0] ) + 15];
+	for( i = 2; i < 4; i++ ){
 		collideField[ 19 * (xlength * dim_pow2 + dim) + Iindex[i] ] = collideField[ 19 * ( (xlength + LATTICEVELOCITIES[Iindex[i]][2]) * dim_pow2 + 
 			                                          (1 + LATTICEVELOCITIES[Iindex[i]][1]) * dim + LATTICEVELOCITIES[Iindex[i]][0] ) + 18 - Iindex[i]];
 	}
