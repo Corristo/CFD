@@ -6,7 +6,7 @@
 #define MOVING_WALL 2
 #include <stdint.h>
 
-static const int64_t LATTICEVELOCITIES[PARAMQ][3] = {{0, -1, -1},
+static const int32_t LATTICEVELOCITIES[PARAMQ][3] = {{0, -1, -1},
                                           {-1, 0, -1},
                                           {0, 0, -1},
                                           {1, 0, -1},

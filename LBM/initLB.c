@@ -19,14 +19,7 @@ int readParameters(int *xlength, double *tau, double *velocityWall, int *timeste
     {
 
         fprintf(stderr, "Usage: %s <input_file>\n", argv[0]);
-        READ_INT("/home/manuel/Entwicklung/CFD/Sheet 2/cavity100.dat", *xlength);
-        READ_DOUBLE("/home/manuel/Entwicklung/CFD/Sheet 2/cavity100.dat", *tau);
-        read_double("/home/manuel/Entwicklung/CFD/Sheet 2/cavity100.dat", "velocityWallX", velocityWall);
-        read_double("/home/manuel/Entwicklung/CFD/Sheet 2/cavity100.dat", "velocityWallY", velocityWall + 1);
-        read_double("/home/manuel/Entwicklung/CFD/Sheet 2/cavity100.dat", "velocityWallZ", velocityWall + 2);
-        READ_INT("/home/manuel/Entwicklung/CFD/Sheet 2/cavity100.dat", *timesteps);
-        READ_INT("/home/manuel/Entwicklung/CFD/Sheet 2/cavity100.dat", *timestepsPerPlotting);
-        return 0;
+        return -1;
     }
 
     return 0;
@@ -35,7 +28,6 @@ int readParameters(int *xlength, double *tau, double *velocityWall, int *timeste
 
 void initialiseFields(double *collideField, double *streamField, int *flagField, int xlength)
 {
-    /* TODO */
     int i, x, y, z;
 
     for (z = 0; z <= xlength + 1; z++)
