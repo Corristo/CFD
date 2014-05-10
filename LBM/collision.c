@@ -12,14 +12,14 @@ void computePostCollisionDistributions(double *currentCell, const double * const
     }
 }
 
-void doCollision(double *collideField, int *flagField,const double * const tau,int xlength)
+void doCollision(double *collideField, int *flagField,const double * const tau,int *xlength)
 {
     double velocity[3], density,  feq[PARAMQ], *currentCell;
-    for (int z = 1; z <= xlength; z++)
-        for (int y = 1; y <= xlength ; y++)
-            for (int x = 1; x <= xlength; x++)
+    for (int z = 1; z <= xlength[2]; z++)
+        for (int y = 1; y <= xlength[1] ; y++)
+            for (int x = 1; x <= xlength[0]; x++)
             {
-                currentCell = collideField + PARAMQ * (z * (xlength + 2) * (xlength + 2) + y * (xlength + 2) + x);
+                currentCell = collideField + PARAMQ * (z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x);
                 density = 0.0;
                 computeDensitySSE(currentCell, &density);
 

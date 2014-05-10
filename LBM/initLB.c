@@ -6,7 +6,9 @@ int readParameters(int *xlength, double *tau, double *velocityWall, int *timeste
     /* TODO */
     if (argc == 2)
     {
-        READ_INT(argv[1], *xlength);
+        read_int(argv[1], "xlength", xlength);
+        read_int(argv[1], "ylength", xlength + 1);
+        read_int(argv[1], "zlength", xlength + 2);
         READ_DOUBLE(argv[1], *tau);
         read_double(argv[1], "velocityWallX", velocityWall);
         read_double(argv[1], "velocityWallY", velocityWall + 1);
@@ -26,56 +28,57 @@ int readParameters(int *xlength, double *tau, double *velocityWall, int *timeste
 }
 
 
-void initialiseFields(double *collideField, double *streamField, int *flagField, int xlength)
+void initialiseFields(double *collideField, double *streamField, int *flagField, int *xlength)
 {
     int i, x, y, z;
 
-    for (z = 0; z <= xlength + 1; z++)
-        for (y = 0; y <= xlength + 1; y++)
-            for (x = 0; x <= xlength + 1; x++)
+    for (z = 0; z <= xlength[2] + 1; z++)
+        for (y = 0; y <= xlength[1] + 1; y++)
+            for (x = 0; x <= xlength[0] + 1; x++)
             {
                 for (i = 0; i < PARAMQ; i++)
                 {
-                    collideField[PARAMQ * (z * (xlength + 2) * (xlength + 2) + y * (xlength + 2) + x) + i] = LATTICEWEIGHTS[i];
-                    streamField[PARAMQ * (z * (xlength + 2) * (xlength + 2) + y * (xlength + 2) + x) + i] = LATTICEWEIGHTS[i];
+                    collideField[PARAMQ * (z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i] = LATTICEWEIGHTS[i];
+                    streamField[PARAMQ * (z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i] = LATTICEWEIGHTS[i];
                 }
-                flagField[z * (xlength + 2) * (xlength + 2) + y * (xlength + 2) + x] = FLUID;
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = FLUID;
             }
 
     /* back boundary */
     z = 0;
-    for (y = 0; y <= xlength + 1; y++)
-        for (x = 0; x <= xlength + 1; x++)
-            flagField[z * (xlength + 2) * (xlength + 2) + (xlength + 2) * y + x] = NO_SLIP;
+    for (y = 0; y <= xlength[1] + 1; y++)
+        for (x = 0; x <= xlength[0] + 1; x++)
+            flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
 
     /* bottom boundary */
     y = 0;
-    for (z = 0; z <= xlength + 1; z++)
-        for (x = 0; x <= xlength + 1; x++)
-            flagField[z * (xlength + 2) * (xlength + 2) + (xlength + 2) * y + x] = NO_SLIP;
+    for (z = 0; z <= xlength[2] + 1; z++)
+        for (x = 0; x <= xlength[0] + 1; x++)
+            flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
 
     /* left boundary */
     x = 0;
-    for (z = 0; z <= xlength + 1; z++)
-        for (y = 0; y <= xlength + 1; y++)
-            flagField[z * (xlength + 2) * (xlength + 2) + (xlength + 2) * y + x] = NO_SLIP;
+    for (z = 0; z <= xlength[2] + 1; z++)
+        for (y = 0; y <= xlength[1] + 1; y++)
+            flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
 
     /* right boundary */
-    x = xlength + 1;
-    for (z = 0; z <= xlength + 1; z++)
-        for (y = 0; y <= xlength + 1; y++)
-            flagField[z * (xlength + 2) * (xlength + 2) + (xlength + 2) * y + x] = NO_SLIP;
+    x = xlength[0] + 1;
+    for (z = 0; z <= xlength[2] + 1; z++)
+        for (y = 0; y <= xlength[1] + 1; y++)
+            flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
 
     /* front boundary, i.e. z = xlength + 1 */
-    for (y = 0; y <= xlength + 1; y++)
-        for (x = 0; x <= xlength + 1; x++)
-            flagField[(xlength + 1) * (xlength + 2) * (xlength + 2) + y * (xlength + 2) + x] = NO_SLIP;
+    z = xlength[2] + 1;
+    for (y = 0; y <= xlength[1] + 1; y++)
+        for (x = 0; x <= xlength[0] + 1; x++)
+            flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
 
     /* top boundary */
-    y = xlength + 1;
-    for (z = 0; z <= xlength + 1; z++)
-        for (x = 0; x <= xlength + 1; x++)
-            flagField[z * (xlength + 2) * (xlength + 2)+ (xlength + 2) * y + x] = MOVING_WALL;
+    y = xlength[1] + 1;
+    for (z = 0; z <= xlength[2] + 1; z++)
+        for (x = 0; x <= xlength[0] + 1; x++)
+            flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = MOVING_WALL;
 
 }
 
