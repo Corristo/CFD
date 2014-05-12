@@ -13,21 +13,22 @@ int main(int argc, char *argv[])
 {
     double *collideField = NULL;
     double *streamField = NULL;
+    char problem[100];
     int *flagField = NULL;
     clock_t begin, end;
     double time_spent;
 
     int xlength[3], timesteps, timestepsPerPlotting;
-    double tau, velocityWall[3];
+    double tau, bddParams[7];
 
 
-    if(readParameters(xlength, &tau, velocityWall, &timesteps, &timestepsPerPlotting, argc, argv) == 0)
+    if(readParameters(xlength, &tau, bddParams, &timesteps, &timestepsPerPlotting, problem,  argc, argv) == 0)
     {
         begin = clock();
         collideField = (double*) malloc((size_t) sizeof(double) * PARAMQ * (xlength[0] + 2)*(xlength[1] + 2)*(xlength[2] + 2));
         streamField = (double*) malloc((size_t) sizeof(double) * PARAMQ * (xlength[0] + 2)*(xlength[1] + 2)*(xlength[2] + 2));
         flagField = (int *) malloc((size_t) sizeof (int) * (xlength[0] + 2)*(xlength[1] + 2)*(xlength[2] + 2));
-        initialiseFields(collideField, streamField, flagField, xlength);
+        initialiseFields(collideField, streamField, flagField, xlength, problem);
 
         writeVtkOutput(streamField, flagField, "./Paraview/output", 0, xlength);
 
@@ -42,7 +43,7 @@ int main(int argc, char *argv[])
 
             doCollision(collideField, flagField, &tau, xlength);
 
-            treatBoundary(collideField, flagField, velocityWall, xlength);
+            treatBoundary(collideField, flagField, bddParams, xlength);
 
             if (t % timestepsPerPlotting == 0)
                 writeVtkOutput(collideField, flagField, "./Paraview/output", (unsigned int) t / timestepsPerPlotting, xlength);
