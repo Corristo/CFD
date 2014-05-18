@@ -14,6 +14,7 @@ int main(int argc, char *argv[])
     double *collideField = NULL;
     double *streamField = NULL;
     char problem[100];
+    char pgmInput[1000];
     int *flagField = NULL;
     clock_t begin, end;
     double time_spent;
@@ -22,13 +23,13 @@ int main(int argc, char *argv[])
     double tau, bddParams[7];
 
 
-    if(readParameters(xlength, &tau, bddParams, &timesteps, &timestepsPerPlotting, problem,  argc, argv) == 0)
+    if(readParameters(xlength, &tau, bddParams, &timesteps, &timestepsPerPlotting, problem, pgmInput, argc, argv) == 0)
     {
         begin = clock();
         collideField = (double*) malloc((size_t) sizeof(double) * PARAMQ * (xlength[0] + 2)*(xlength[1] + 2)*(xlength[2] + 2));
         streamField = (double*) malloc((size_t) sizeof(double) * PARAMQ * (xlength[0] + 2)*(xlength[1] + 2)*(xlength[2] + 2));
         flagField = (int *) malloc((size_t) sizeof (int) * (xlength[0] + 2)*(xlength[1] + 2)*(xlength[2] + 2));
-        initialiseFields(collideField, streamField, flagField, xlength, problem);
+        initialiseFields(collideField, streamField, flagField, xlength, problem, pgmInput);
 
         writeVtkOutput(streamField, flagField, "./Paraview/output", 0, xlength);
 
