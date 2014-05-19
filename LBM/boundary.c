@@ -2889,7 +2889,7 @@ void treatBoundary(double *collideField, int* flagField, const double * const bd
     for (z = 1; z <= xlength[2]; z++)
         for (y = 1; y <= xlength[1]; y++)
             for(x = 1; x <= xlength[0]; x++)
-                if (__builtin_expect(!!flagField[x + (xlength[0] + 2) * y + (xlength[0] + 2) * (xlength[1] + 2) * z], 0))
+                if (!!flagField[x + (xlength[0] + 2) * y + (xlength[0] + 2) * (xlength[1] + 2) * z])
                     for (i = 0; i < PARAMQ; i++)
                     {
                         neighbourCoordX = x + LATTICEVELOCITIES[i][0];
