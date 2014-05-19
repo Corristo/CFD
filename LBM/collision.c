@@ -6,7 +6,8 @@
 
 void computePostCollisionDistributions(double *currentCell, const double * const tau, const double *const feq)
 {
-    for (int i = 0; i < PARAMQ; i++)
+    int i;
+    for (i = 0; i < PARAMQ; i++)
     {
         currentCell[i] = currentCell[i] * (1 - 1./ (*tau )) + 1./ (*tau)  * feq[i];
     }
@@ -15,9 +16,10 @@ void computePostCollisionDistributions(double *currentCell, const double * const
 void doCollision(double *collideField, int *flagField,const double * const tau,int *xlength)
 {
     double velocity[3], density,  feq[PARAMQ], *currentCell;
-    for (int z = 1; z <= xlength[2]; z++)
-        for (int y = 1; y <= xlength[1] ; y++)
-            for (int x = 1; x <= xlength[0]; x++)
+    int x, y, z;
+    for (z = 1; z <= xlength[2]; z++)
+        for (y = 1; y <= xlength[1] ; y++)
+            for (x = 1; x <= xlength[0]; x++)
             {
                 currentCell = collideField + PARAMQ * (z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x);
                 density = 0.0;
