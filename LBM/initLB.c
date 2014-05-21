@@ -141,6 +141,19 @@ void initialiseFields(double *collideField, double *streamField, int *flagField,
             for (y = 1; y <= xlength[1]; y++)
                 for (x = 1; x <= xlength[0]; x++)
                     flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = pgmImage[x][y];
+        free(pgmImage);
+
+         /* front boundary, i.e. z = xlength + 1 */
+        z = xlength[2] + 1;
+        for (y = 0; y <= xlength[1] + 1; y++)
+            for (x = 0; x <= xlength[0] + 1; x++)
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = FREE_SLIP;
+
+         /* back boundary */
+        z = 0;
+        for (y = 0; y <= xlength[1] + 1; y++)
+            for (x = 0; x <= xlength[0] + 1; x++)
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = FREE_SLIP;
 
 
         /* left boundary */
@@ -155,17 +168,6 @@ void initialiseFields(double *collideField, double *streamField, int *flagField,
             for (y = 0; y <= xlength[1] + 1; y++)
                 flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = OUTFLOW;
 
-        /* front boundary, i.e. z = xlength + 1 */
-        z = xlength[2] + 1;
-        for (y = 0; y <= xlength[1] + 1; y++)
-            for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = FREE_SLIP;
-
-         /* back boundary */
-        z = 0;
-        for (y = 0; y <= xlength[1] + 1; y++)
-            for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = FREE_SLIP;
 
         /* top boundary */
         y = xlength[1] + 1;
@@ -183,17 +185,6 @@ void initialiseFields(double *collideField, double *streamField, int *flagField,
     if (!strcmp(problem, "flowStep"))
     {
 
-        /* left boundary */
-        x = 0;
-        for (z = 0; z <= xlength[2] + 1; z++)
-            for (y = 0; y <= xlength[1] + 1; y++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = INFLOW;
-
-        /* right boundary */
-        x = xlength[0] + 1;
-        for (z = 0; z <= xlength[2] + 1; z++)
-            for (y = 0; y <= xlength[1] + 1; y++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = OUTFLOW;
 
         /* front boundary, i.e. z = xlength + 1 */
         z = xlength[2] + 1;
@@ -206,6 +197,19 @@ void initialiseFields(double *collideField, double *streamField, int *flagField,
         for (y = 0; y <= xlength[1] + 1; y++)
             for (x = 0; x <= xlength[0] + 1; x++)
                 flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+
+        /* left boundary */
+        x = 0;
+        for (z = 0; z <= xlength[2] + 1; z++)
+            for (y = 0; y <= xlength[1] + 1; y++)
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = INFLOW;
+
+        /* right boundary */
+        x = xlength[0] + 1;
+        for (z = 0; z <= xlength[2] + 1; z++)
+            for (y = 0; y <= xlength[1] + 1; y++)
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = OUTFLOW;
+
 
          /* top boundary */
         y = xlength[1] + 1;
@@ -229,22 +233,20 @@ void initialiseFields(double *collideField, double *streamField, int *flagField,
     }
     if (!strcmp(problem, "planeShearFlow"))
     {
-        /* top boundary */
-        y = xlength[1] + 1;
-        for (z = 0; z <= xlength[2] + 1; z++)
+
+         /* front boundary, i.e. z = xlength + 1 */
+        z = xlength[2] + 1;
+        for (y = 0; y <= xlength[1] + 1; y++)
             for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = FREE_SLIP;
+
         /* back boundary */
         z = 0;
         for (y = 0; y <= xlength[1] + 1; y++)
             for (x = 0; x <= xlength[0] + 1; x++)
                 flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = FREE_SLIP;
 
-        /* bottom boundary */
-        y = 0;
-        for (z = 0; z <= xlength[2] + 1; z++)
-            for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+
 
         /* left boundary */
         x = 0;
@@ -258,11 +260,18 @@ void initialiseFields(double *collideField, double *streamField, int *flagField,
             for (y = 0; y <= xlength[1] + 1; y++)
                 flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = OUTFLOW;
 
-        /* front boundary, i.e. z = xlength + 1 */
-        z = xlength[2] + 1;
-        for (y = 0; y <= xlength[1] + 1; y++)
+
+        /* top boundary */
+        y = xlength[1] + 1;
+        for (z = 0; z <= xlength[2] + 1; z++)
             for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = FREE_SLIP;
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+
+        /* bottom boundary */
+        y = 0;
+        for (z = 0; z <= xlength[2] + 1; z++)
+            for (x = 0; x <= xlength[0] + 1; x++)
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
     }
 }
 

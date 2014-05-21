@@ -8,6 +8,7 @@
 #include "boundary.h"
 #include "LBDefinitions.h"
 #include <time.h>
+#include <unistd.h>
 
 int main(int argc, char *argv[])
 {
@@ -32,7 +33,7 @@ int main(int argc, char *argv[])
         initialiseFields(collideField, streamField, flagField, xlength, problem, pgmInput);
 
         writeVtkOutput(streamField, flagField, "./Paraview/output", 0, xlength);
-
+        printf("Progress:     ");
         for(int t = 0; t < timesteps; t++)
         {
             double *swap = NULL;
@@ -48,8 +49,14 @@ int main(int argc, char *argv[])
 
             if (t % timestepsPerPlotting == 0)
                 writeVtkOutput(collideField, flagField, "./Paraview/output", (unsigned int) t / timestepsPerPlotting, xlength);
+            int pct = ((float) t / timesteps) * 100;
+
+            printf("\b\b\b%02d%%", pct);
+
+
 
         }
+        printf("\n");
         end = clock();
         time_spent = (double) (end - begin) / CLOCKS_PER_SEC;
 
