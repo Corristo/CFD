@@ -52,11 +52,11 @@ int main(int argc, char *argv[])
             int pct = ((float) t / timesteps) * 100;
 
             printf("\b\b\b%02d%%", pct);
-
+            fflush(stdout);
 
 
         }
-        printf("\n");
+        printf("\b\b\b\b100%%\n");
         end = clock();
         time_spent = (double) (end - begin) / CLOCKS_PER_SEC;
 
