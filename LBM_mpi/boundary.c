@@ -32,7 +32,7 @@ void treatBoundary(double *collideField, int* flagField, const double * const bd
             *iList = 0; *(iList + 1) = 5; *(iList + 2) = 7; *(iList + 3) = 14; *(iList + 4) = 6;
 
             if( boundaryType != FREE_SLIP ){
-                compute_boundary(collideField, bddParams, flagField, boundaryType, xlength, iList, 5, coordinate);
+                compute_boundary(collideField, bddParams, flagField, boundaryType, xlength, iList, coordinate);
             } else  {
                     if (!flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + (y - 1) * (xlength[0] + 2) + x])
                     {
@@ -78,7 +78,7 @@ void treatBoundary(double *collideField, int* flagField, const double * const bd
             *iList = 14; *(iList + 1) = 15; *(iList + 2) = 17; *(iList + 3) = 18; *(iList + 4) = 16;
 
             if( boundaryType != FREE_SLIP ){
-                compute_boundary(collideField, bddParams, flagField, boundaryType, xlength, iList, 5, coordinate);
+                compute_boundary(collideField, bddParams, flagField, boundaryType, xlength, iList, coordinate);
             } else {
                     if (!flagField[(z + 1) * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x])
                     {
@@ -124,7 +124,7 @@ void treatBoundary(double *collideField, int* flagField, const double * const bd
             *iList = 4; *(iList + 1) = 11; *(iList + 2) = 13; *(iList + 3) = 18; *(iList + 4) = 12;
 
             if( boundaryType != FREE_SLIP ){
-                compute_boundary(collideField, bddParams, flagField, boundaryType, xlength, iList, 5, coordinate);
+                compute_boundary(collideField, bddParams, flagField, boundaryType, xlength, iList, coordinate);
 
             } else {
                     if (!flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + (y + 1) * (xlength[0] + 2) + x])
@@ -170,7 +170,7 @@ void treatBoundary(double *collideField, int* flagField, const double * const bd
             *iList = 3; *(iList + 1) = 7; *(iList + 2) = 13; *(iList + 3) = 17; *(iList + 4) = 10;
 
             if( boundaryType != FREE_SLIP ){
-                compute_boundary(collideField, bddParams, flagField, boundaryType, xlength, iList, 5, coordinate);
+                compute_boundary(collideField, bddParams, flagField, boundaryType, xlength, iList, coordinate);
             } else{
                     if (!flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x + 1])
                     {
@@ -216,7 +216,7 @@ void treatBoundary(double *collideField, int* flagField, const double * const bd
             *iList = 1; *(iList + 1) = 5; *(iList + 2) = 11; *(iList + 3) = 15; *(iList + 4) = 8;
 
             if( boundaryType != FREE_SLIP ){
-                compute_boundary(collideField, bddParams, flagField, boundaryType, xlength, iList, 5, coordinate);
+                compute_boundary(collideField, bddParams, flagField, boundaryType, xlength, iList, coordinate);
             } else {
                     if (!flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x - 1])
                     {
@@ -261,7 +261,7 @@ void treatBoundary(double *collideField, int* flagField, const double * const bd
             *iList = 0; *(iList + 1) = 1; *(iList + 2) = 3; *(iList + 3) = 4; *(iList + 4) = 2;
 
             if( boundaryType != FREE_SLIP ){
-                compute_boundary(collideField, bddParams, flagField, boundaryType, xlength, iList, 5, coordinate);
+                compute_boundary(collideField, bddParams, flagField, boundaryType, xlength, iList, coordinate);
             } else {
                     if (!flagField[(z - 1) * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x])
                     {
@@ -318,7 +318,7 @@ void treatBoundary(double *collideField, int* flagField, const double * const bd
 
 /** boundary helper function */
 void compute_boundary(double *collideField, const double * const bddParams, int *flagField,
-                         int boundaryType, int *xlength, int *iList, int inum, int *const coordinate){
+                         int boundaryType, int *xlength, int *iList, int *const coordinate){
 
     int i;
     int neighbourCoordX, neighbourCoordY, neighbourCoordZ;
@@ -335,7 +335,7 @@ void compute_boundary(double *collideField, const double * const bddParams, int 
     {
         case NO_SLIP:
         {
-            for(i = 0; i < inum; i++ ){
+            for(i = 0; i < 5; i++ ){
                     neighbourCoordX = coordinate[0] + LATTICEVELOCITIES[iList[i]][0];
                     neighbourCoordY = coordinate[1] + LATTICEVELOCITIES[iList[i]][1];
                     neighbourCoordZ = coordinate[2] + LATTICEVELOCITIES[iList[i]][2];
@@ -353,7 +353,7 @@ void compute_boundary(double *collideField, const double * const bddParams, int 
 
         case MOVING_WALL:
         {
-            for(i = 0; i < inum; i++ ){
+            for(i = 0; i < 5; i++ ){
                     neighbourCoordX = coordinate[0] + LATTICEVELOCITIES[iList[i]][0];
                     neighbourCoordY = coordinate[1] + LATTICEVELOCITIES[iList[i]][1];
                     neighbourCoordZ = coordinate[2] + LATTICEVELOCITIES[iList[i]][2];
@@ -375,7 +375,7 @@ void compute_boundary(double *collideField, const double * const bddParams, int 
 
         case INFLOW:
         {
-            for(i = 0; i < inum; i++ ){
+            for(i = 0; i < 5; i++ ){
                 neighbourCoordX = coordinate[0] + LATTICEVELOCITIES[iList[i]][0];
                 neighbourCoordY = coordinate[1] + LATTICEVELOCITIES[iList[i]][1];
                 neighbourCoordZ = coordinate[2] + LATTICEVELOCITIES[iList[i]][2];
@@ -395,7 +395,7 @@ void compute_boundary(double *collideField, const double * const bddParams, int 
 
         case OUTFLOW:
         {
-            for(i = 0; i < inum; i++ ){                  
+            for(i = 0; i < 5; i++ ){                  
                 neighbourCoordX = coordinate[0] + LATTICEVELOCITIES[iList[i]][0];
                 neighbourCoordY = coordinate[1] + LATTICEVELOCITIES[iList[i]][1];
                 neighbourCoordZ = coordinate[2] + LATTICEVELOCITIES[iList[i]][2];
@@ -417,7 +417,7 @@ void compute_boundary(double *collideField, const double * const bddParams, int 
 
         case PRESSURE_IN:
         {
-            for(i = 0; i < inum; i++ ){                  
+            for(i = 0; i < 5; i++ ){                  
                 neighbourCoordX = coordinate[0] + LATTICEVELOCITIES[iList[i]][0];
                 neighbourCoordY = coordinate[1] + LATTICEVELOCITIES[iList[i]][1];
                 neighbourCoordZ = coordinate[2] + LATTICEVELOCITIES[iList[i]][2];
@@ -440,9 +440,7 @@ void compute_boundary(double *collideField, const double * const bddParams, int 
     }
 
 }
-//
-//
-//
+
 //
 //    /* top boundary */
 //    y = xlength[1] + 1;
