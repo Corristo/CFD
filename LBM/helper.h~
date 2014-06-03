@@ -168,7 +168,7 @@ void write_matrix(
   int fFirst
 );
 
-void write_imatrix( const char* szFileName,     /* filename */
+void write_matrix( const char* szFileName,     /* filename */
                    int **m,                 /* matrix */
                    int nrl,                    /* first column */
                    int nrh,                    /* last column */

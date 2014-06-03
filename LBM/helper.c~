@@ -325,7 +325,7 @@ void write_imatrix( const char* szFileName,     /* filename */
        for( i = nrl; i <= nrh; i++)
            tmp[k++] = m[i][j];
 
-   fwrite( tmp, sizeof(int), (size_t)nSize, fh);
+   fwrite( tmp, sizeof(float), (size_t)nSize, fh);
 
    if( fclose(fh) )
    {

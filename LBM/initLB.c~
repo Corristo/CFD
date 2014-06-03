@@ -143,7 +143,7 @@ void initialiseFields(double *collideField, double *streamField, int *flagField,
             for (y = 1; y <= xlength[1]; y++)
                 for (x = 1; x <= xlength[0]; x++)
                     flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = pgmImage[x][y];
-        //free_imatrix(pgmImage, 0, xlength[0] + 2, 0, xlength[1] + 2);
+        free_imatrix(pgmImage, 0, xlength[0] + 2, 0, xlength[1] + 2);
 
          /* front boundary, i.e. z = xlength + 1 */
         z = xlength[2] + 1;
