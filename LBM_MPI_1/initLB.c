@@ -535,19 +535,19 @@ void swap_send_read( double**sendBuffer ,double**readBuffer ,int*xlength,int il,
    MPI_Status status;
    
    MPI_Send( sendBuffer[0], size_x, MPI_DOUBLE, ir, 1, MPI_COMM_WORLD );
-   MPI_Recv( readBuffer[0], size_x, MPI_DOUBLE, il, 1, MPI_COMM_WORLD, &status );
+   MPI_Recv( readBuffer[1], size_x, MPI_DOUBLE, il, 1, MPI_COMM_WORLD, &status );
    MPI_Send( sendBuffer[1], size_x, MPI_DOUBLE, il, 1, MPI_COMM_WORLD );
-   MPI_Recv( readBuffer[1], size_x, MPI_DOUBLE, ir, 1, MPI_COMM_WORLD, &status );
+   MPI_Recv( readBuffer[0], size_x, MPI_DOUBLE, ir, 1, MPI_COMM_WORLD, &status );
    
    MPI_Send( sendBuffer[2], size_y, MPI_DOUBLE, jt, 1, MPI_COMM_WORLD );
-   MPI_Recv( readBuffer[2], size_y, MPI_DOUBLE, jb, 1, MPI_COMM_WORLD, &status );
-   MPI_Send( sendBuffer[3], size_y, MPI_DOUBLE, jt, 1, MPI_COMM_WORLD );
    MPI_Recv( readBuffer[3], size_y, MPI_DOUBLE, jb, 1, MPI_COMM_WORLD, &status );
+   MPI_Send( sendBuffer[3], size_y, MPI_DOUBLE, jt, 1, MPI_COMM_WORLD );
+   MPI_Recv( readBuffer[2], size_y, MPI_DOUBLE, jb, 1, MPI_COMM_WORLD, &status );
    
    MPI_Send( sendBuffer[4], size_z, MPI_DOUBLE, kf, 1, MPI_COMM_WORLD );
-   MPI_Recv( readBuffer[4], size_z, MPI_DOUBLE, kb, 1, MPI_COMM_WORLD, &status );
-   MPI_Send( sendBuffer[5], size_z, MPI_DOUBLE, kf, 1, MPI_COMM_WORLD );
    MPI_Recv( readBuffer[5], size_z, MPI_DOUBLE, kb, 1, MPI_COMM_WORLD, &status );
+   MPI_Send( sendBuffer[5], size_z, MPI_DOUBLE, kf, 1, MPI_COMM_WORLD );
+   MPI_Recv( readBuffer[4], size_z, MPI_DOUBLE, kb, 1, MPI_COMM_WORLD, &status );
 
    if ( MPI_PROC_NULL != ir )
       printf("Proc %2d : ID right x neighbor = %2d\n", myrank, ir);
@@ -561,5 +561,83 @@ void swap_send_read( double**sendBuffer ,double**readBuffer ,int*xlength,int il,
 
 void  inject(double**readBuffer,double*collideField,int*xlength)
 {
+    /* x right */
+    int x , y , z , cellindex;
+    x = xlength[0] + 1;
+    for (z = 0; z <= xlength[2] + 1; z++)
+    for (y = 0; y <= xlength[1] + 1; y++)
+    {
+        cellindex = z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x ;
+        collideField[PARAMQ*cellindex + 13] = readBuffer[0][5*(z*(xlength[2]+1)+y)+0] ;
+        collideField[PARAMQ*cellindex + 3] = readBuffer[0][5*(z*(xlength[2]+1)+y)+1] ;
+        collideField[PARAMQ*cellindex + 10] = readBuffer[0][5*(z*(xlength[2]+1)+y)+2] ;
+        collideField[PARAMQ*cellindex + 17] = readBuffer[0][5*(z*(xlength[2]+1)+y)+3] ;
+        collideField[PARAMQ*cellindex + 7] = readBuffer[0][5*(z*(xlength[2]+1)+y)+4] ;
+    }
+
+    /* x left */
+    x = 0;
+    for (z = 0; z <= xlength[2] + 1; z++)
+    for (y = 0; y <= xlength[1] + 1; y++)
+    {
+        cellindex = z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x ;
+        collideField[PARAMQ*cellindex + 11] = readBuffer[1][5*(z*(xlength[2]+1)+y)+0] ;
+        collideField[PARAMQ*cellindex + 1] = readBuffer[1][5*(z*(xlength[2]+1)+y)+1] ;
+        collideField[PARAMQ*cellindex + 8] = readBuffer[1][5*(z*(xlength[2]+1)+y)+2] ;
+        collideField[PARAMQ*cellindex + 15] = readBuffer[1][5*(z*(xlength[2]+1)+y)+3] ;
+        collideField[PARAMQ*cellindex + 5] = readBuffer[1][5*(z*(xlength[2]+1)+y)+4] ;
+    }
+
+    /* y top */
+    y = xlength[1] + 1;
+    for (x = 0; x <= xlength[0] + 1; x++)
+    for (z = 0; z <= xlength[2] + 1; z++)
+    {
+        cellindex = z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x ;
+        collideField[PARAMQ*cellindex + 4] = readBuffer[2][5*(x*(xlength[0]+1)+z)+0] ;
+        collideField[PARAMQ*cellindex + 11] = readBuffer[2][5*(x*(xlength[0]+1)+z)+1] ;
+        collideField[PARAMQ*cellindex + 12] = readBuffer[2][5*(x*(xlength[0]+1)+z)+2] ;
+        collideField[PARAMQ*cellindex + 13] = readBuffer[2][5*(x*(xlength[0]+1)+z)+3] ;
+        collideField[PARAMQ*cellindex + 18] = readBuffer[2][5*(x*(xlength[0]+1)+z)+4] ;
+    }
+
+    /* y bottom */
+    y = 0;
+    for (x = 0; x <= xlength[0] + 1; x++)
+    for (z = 0; z <= xlength[2] + 1; z++)
+    {
+        cellindex = z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x ;
+        collideField[PARAMQ*cellindex + 0] = readBuffer[3][5*(x*(xlength[0]+1)+x)+0] ;
+        collideField[PARAMQ*cellindex + 5] = readBuffer[3][5*(x*(xlength[0]+1)+x)+1] ;
+        collideField[PARAMQ*cellindex + 6] = readBuffer[3][5*(x*(xlength[0]+1)+x)+2] ;
+        collideField[PARAMQ*cellindex + 7] = readBuffer[3][5*(x*(xlength[0]+1)+x)+3] ;
+        collideField[PARAMQ*cellindex + 14] = readBuffer[3][5*(x*(xlength[0]+1)+x)+4] ;
+    }
+
+    /* z front */
+    z = xlength[2] + 1;
+    for (y = 0; y <= xlength[1] + 1; y++)
+    for (x = 0; x <= xlength[0] + 1; x++)
+    {
+        cellindex = z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x ;
+        collideField[PARAMQ*cellindex + 4] = readBuffer[4][5*(y*(xlength[1]+1)+x)+0] ;
+        collideField[PARAMQ*cellindex + 1] = readBuffer[4][5*(y*(xlength[1]+1)+x)+1] ;
+        collideField[PARAMQ*cellindex + 2] = readBuffer[4][5*(y*(xlength[1]+1)+x)+2] ;
+        collideField[PARAMQ*cellindex + 3] = readBuffer[4][5*(y*(xlength[1]+1)+x)+3] ;
+        collideField[PARAMQ*cellindex + 0] = readBuffer[4][5*(y*(xlength[1]+1)+x)+4] ;
+    }
+
+    /* z back */
+    z = 0;
+    for (y = 0; y <= xlength[1] + 1; y++)
+    for (x = 0; x <= xlength[0] + 1; x++)
+    {
+        cellindex = z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x ;
+        collideField[PARAMQ*cellindex + 18] = readBuffer[5][5*(y*(xlength[1]+1)+x)+0] ;
+        collideField[PARAMQ*cellindex + 15] = readBuffer[5][5*(y*(xlength[1]+1)+x)+1] ;
+        collideField[PARAMQ*cellindex + 16] = readBuffer[5][5*(y*(xlength[1]+1)+x)+2] ;
+        collideField[PARAMQ*cellindex + 17] = readBuffer[5][5*(y*(xlength[1]+1)+x)+3] ;
+        collideField[PARAMQ*cellindex + 14] = readBuffer[5][5*(y*(xlength[1]+1)+x)+4] ;
+    }
 
 }
