@@ -57,4 +57,3 @@ void initializeMPI(int * rank,int * number_of_ranks, int argc , char ** argv)
    MPI_Comm_size( MPI_COMM_WORLD, &(*number_of_ranks) );     /* asking for the number of processes  */
    MPI_Comm_rank( MPI_COMM_WORLD, &(*rank) );    /* asking for the local process id   */
 }
-

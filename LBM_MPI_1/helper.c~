@@ -168,12 +168,10 @@ void read_string( const char* szFileName, const char* szVarName, char*   pVariab
     if( sscanf( szValue, "%s", pVariable) == 0)
         READ_ERROR("wrong format", szVarName, szFileName,0);
 
-    /*
-    printf( "File: %s\t\t%s%s= %s ", szFileName,
+    //printf( "File: %s\t\t%s%s= %s ", szFileName,
                                       szVarName,
                                       &("               "[min_int( (int)strlen(szVarName), 15)]),
                                       pVariable );
-    */
 }
 
 void read_int( const char* szFileName, const char* szVarName, int* pVariable)

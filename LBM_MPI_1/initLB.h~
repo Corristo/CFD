@@ -25,11 +25,11 @@ void initialiseBuffers(double*sendBuffer[],double**readBuffer,int*xlength);
 
 void extract(double*(sendBuffer[]),double*collideField,int*xlength);
 
-void decideneighbours(int*il,int*ir,int*jb,int*jt,int*kf,int*kb,int iProc,int jProc,int kProc,int rank);
+void decideneighbours(int*il,int*ir,int*jb,int*jt,int*kf,int*kb,int iProc,int jProc,int kProc,int rank,int *xlength)
 
 void swap_send_read( double**sendBuffer ,double**readBuffer ,int*xlength,int il,int ir,int jb,int jt,int kf,int kb,int rank);
 
-void  inject(double**readBuffer,double*collideField,int*xlength)
+void  inject(double**readBuffer,double*collideField,int*xlength);
 
 #endif
 

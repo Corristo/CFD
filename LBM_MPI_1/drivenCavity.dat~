@@ -8,6 +8,6 @@ velocityWallX 0.01
 velocityWallY 0.0
 velocityWallZ 0.0
 tau 1.2
-iProc 2
-jProc 2
-kProc 2
+iProc 3
+jProc 3
+kProc 3

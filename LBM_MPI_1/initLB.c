@@ -1,3 +1,5 @@
+#include <stdlib.h>
+#include <stdio.h>
 #include "initLB.h"
 #include "LBDefinitions.h"
 #include <mpi.h>
@@ -21,8 +23,8 @@ int readParameters(int *xlength, double *tau, double *bddParams, int *timesteps,
         read_int(argv[1], "ylength", xlength + 1);
         read_int(argv[1], "zlength", xlength + 2);
         read_int(argv[1], "iProc", iProc);
-        read_int(argv[1], "iProc", jProc);
-        read_int(argv[1], "iProc", kProc);
+        read_int(argv[1], "jProc", jProc);
+        read_int(argv[1], "kProc", kProc);
         READ_DOUBLE(argv[1], *tau);
 
         if(!strcmp(problem, "drivenCavity"))
@@ -142,24 +144,25 @@ void initialiseFields(double *collideField, double *streamField, int *flagField,
        /* 
        If the domain is at the top boundary , then moving wall at the top.
        */
-       if(rank%jProc == jProc-1)
-       {
-           y = xlength[1] + 1;
-           for (z = 0; z <= xlength[2] + 1; z++)
-               for (x = 0; x <= xlength[0] + 1; x++)
-                 flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = MOVING_WALL;
-       }
+   
+   if((rank%(iProc*jProc))>(iProc*jProc - iProc - 1))
+   {    
+        y = xlength[1] + 1;
+        for (z = 0; z <= xlength[2] + 1; z++)
+            for (x = 0; x <= xlength[0] + 1; x++)
+               flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = MOVING_WALL;
+   }
 
 /* 
 If the domain is at the bottom boundary , then no slip at the bottom.
 */
-      if(rank%jProc == 0)
-      {
-          y = 0;
-          for (z = 0; z <= xlength[2] + 1; z++)
-             for (x = 0; x <= xlength[0] + 1; x++)
-                 flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
-      }
+   if(rank%(iProc*jProc)<iProc)
+   {
+       y = 0;
+       for (z = 0; z <= xlength[2] + 1; z++)
+          for (x = 0; x <= xlength[0] + 1; x++)
+              flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+   }
 
 /* 
 If the domain is at the left boundary , then no slip at the left.
@@ -171,7 +174,6 @@ If the domain is at the left boundary , then no slip at the left.
               for (y = 0; y <= xlength[1] + 1; y++)
                 flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
      }
-
 
 /* 
 If the domain is at the right boundary , then no slip at the back.
@@ -187,7 +189,7 @@ If the domain is at the right boundary , then no slip at the back.
 /* 
 If the domain is at the back boundary , then no slip at the right.
 */
-     if(rank%kProc == 0)
+     if((rank%(iProc*jProc*kProc)<(iProc*jProc)))
      {
           z = 0;
           for (y = 0; y <= xlength[1] + 1; y++)
@@ -198,8 +200,8 @@ If the domain is at the back boundary , then no slip at the right.
 /* 
 If the domain is at the front boundary , then no slip at the front.
 */
-    if(rank%kProc == kProc-1)
-    {
+   if(((rank%(iProc*jProc*kProc))>(iProc*jProc*kProc - (iProc*jProc) - 1)))
+   {
          z = xlength[2] + 1;
          for (y = 0; y <= xlength[1] + 1; y++)
              for (x = 0; x <= xlength[0] + 1; x++)
@@ -484,48 +486,40 @@ void extract(double*(sendBuffer[]),double*collideField,int*xlength)
             }
 }
 
-void decideneighbours(int*il,int*ir,int*jb,int*jt,int*kf,int*kb,int iProc,int jProc,int kProc,int rank)
+void decideneighbours(int*il,int*ir,int*jb,int*jt,int*kf,int*kb,int iProc,int jProc,int kProc,int rank,int *xlength)
 {
-   // Right and left neighbour
+
+   // left and right neighbour
+   *il = rank - 1 ; *ir = rank + 1 ;
    if(rank%iProc==0)
    {
-       *il = MPI_PROC_NULL ; *ir = rank + 1 ;
+       *il = MPI_PROC_NULL ;
    }
-   else if(rank%iProc==iProc - 1)
+   if(rank%iProc==iProc - 1)
    {
-       *il = rank - 1 ; *ir = MPI_PROC_NULL ;
+       *ir = MPI_PROC_NULL ;
    }
-   else
+   
+   // bottom and top neighbour
+   *jb = -iProc + rank ; *jt = iProc+rank ;
+   if(rank%(iProc*jProc)<iProc)
    {
-       *il = rank - 1 ; *ir = rank + 1 ;
+       *jb = MPI_PROC_NULL ;
    }
-
-   // top and bottom neighbour
-   if(rank%jProc==0)
+   if((rank%(iProc*jProc))>(iProc*jProc - iProc - 1))
    {
-       *jb = MPI_PROC_NULL ; *jt = rank + 1 ;
-   }
-   else if(rank%jProc==jProc - 1)
-   {
-       *jb = rank + 1 ; *jt = MPI_PROC_NULL ;
-   }
-   else
-   {
-       *jb = rank - 1 ; *jt = rank+1 ;
+       *jt = MPI_PROC_NULL ;
    }
 
-   // front and back neighbour
-   if(rank%kProc==0)
+   // back and front neighbour
+   *kb = -(iProc*jProc) + rank ; *kf = (iProc*jProc) + rank ;
+   if((rank%(iProc*jProc*kProc)<(iProc*jProc)))
    {
-       *kb = MPI_PROC_NULL ; *kf = rank + 1 ;
+       *kb = MPI_PROC_NULL ;
    }
-   else if(rank%kProc==kProc - 1)
+   if(((rank%(iProc*jProc*kProc))>(iProc*jProc*kProc - (iProc*jProc) - 1)))
    {
-       *kb = rank - 1 ; *kf = MPI_PROC_NULL ;
-   }
-   else
-   {
-       *kb = rank - 1 ; *kf = rank+1 ;
+       *kf = MPI_PROC_NULL ;
    }
 }
 
@@ -548,15 +542,6 @@ void swap_send_read( double**sendBuffer ,double**readBuffer ,int*xlength,int il,
    MPI_Recv( readBuffer[5], size_z, MPI_DOUBLE, kb, 1, MPI_COMM_WORLD, &status );
    MPI_Send( sendBuffer[5], size_z, MPI_DOUBLE, kf, 1, MPI_COMM_WORLD );
    MPI_Recv( readBuffer[4], size_z, MPI_DOUBLE, kb, 1, MPI_COMM_WORLD, &status );
-
-   if ( MPI_PROC_NULL != ir )
-      printf("Proc %2d : ID right x neighbor = %2d\n", myrank, ir);
-   else
-      printf("Proc %2d : ID right x neighbor = MPI_PROC_NULL\n", myrank);
-   if ( MPI_PROC_NULL != il )
-      printf("Proc %2d : ID left neighbor = %2d\n", myrank, il);
-   else
-      printf("Proc %2d : ID left neighbor = MPI_PROC_NULL\n", myrank);
 }
 
 void  inject(double**readBuffer,double*collideField,int*xlength)

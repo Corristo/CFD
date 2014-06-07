@@ -55,10 +55,6 @@ void initializeMPI(int * rank,int * number_of_ranks, int argc , char ** argv)
 {
    MPI_Init( &argc, &argv );                    /* execute n processes      */
    MPI_Comm_size( MPI_COMM_WORLD, &(*number_of_ranks) );     /* asking for the number of processes  */
+   printf("number of ranks = %d \n " , *number_of_ranks);
    MPI_Comm_rank( MPI_COMM_WORLD, &(*rank) );    /* asking for the local process id   */
-}
-
-void initialiseFields(double*collideField,double*streamField,int*flagField, xlength, problem, pgmInput)
-{
-     
 }

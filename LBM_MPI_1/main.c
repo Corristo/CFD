@@ -10,6 +10,9 @@
 #include <time.h>
 #include <unistd.h>
 #include <parallel.h>
+#include <mpi.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 int main(int argc, char *argv[])
 {
@@ -39,16 +42,9 @@ int main(int argc, char *argv[])
     if((readParameters(xlength_global, &tau, bddParams, &timesteps, &timestepsPerPlotting, problem, pgmInput, argc, argv,&iProc,&jProc,&kProc) == 0)&&(number_of_ranks==iProc*jProc*kProc))
     {
   
-        printf("iProc from rank %d is %d \n" , rank , iProc); 
-        printf("jProc from rank %d is %d \n" , rank , jProc);
-        printf("kProc from rank %d is %d \n" , rank , kProc);
-
         begin = clock();
         xlength[0] = (xlength_global[0]/iProc) ;xlength[1] = (xlength_global[1]/jProc) ;
         xlength[2] = (xlength_global[2]/kProc) ;
-        printf("xlength[0] from rank %d is %d \n" , rank , xlength[0]); 
-        printf("xlength[1] from rank %d is %d \n" , rank , xlength[1]);
-        printf("xlength[2] from rank %d is %d \n" , rank , xlength[2]);
 
         collideField = (double*) malloc((size_t) sizeof(double) * PARAMQ * (xlength[0] + 2)*(xlength[1] + 2)*(xlength[2] + 2));
         streamField = (double*) malloc((size_t) sizeof(double) * PARAMQ * (xlength[0] + 2)*(xlength[1] + 2)*(xlength[2] + 2));
@@ -61,17 +57,20 @@ int main(int argc, char *argv[])
         initialiseBuffers(sendBuffer,readBuffer,xlength);
         
         writeVtkOutput(streamField, flagField, "./Paraview/output", 0, xlength,rank);
-        printf("Progress:     ");
+        //printf("Progress:     ");
+        int il,ir,jb,jt,kf,kb;
+        decideneighbours(&il,&ir,&jb,&jt,&kf,&kb,iProc,jProc,kProc,rank,xlength);
         
-        for(int t = 0; t < timesteps; t++)
+        for(int t = 0; t < 1; t++)
         {
             double *swap = NULL;
+            
 //          Extraction
             extract( sendBuffer , collideField , xlength );
 //          Swap
-            int il,ir,jb,jt,kf,kb;
-            decideneighbours(&il,&ir,&jb,&jt,&kf,&kb,iProc,jProc,kProc,rank);
-            swap_send_read( sendBuffer , readBuffer , xlength ,il,ir,jb,jt,kf,kb,rank);
+                        
+            swap_send_read( sendBuffer , readBuffer , xlength ,il,ir,jb,jt,kf,kb,rank);            
+/*
 //          Injection
             inject(readBuffer,collideField,xlength);
             doStreaming(collideField, streamField, flagField, xlength);
@@ -79,7 +78,7 @@ int main(int argc, char *argv[])
             collideField = streamField;
             streamField = swap;
 
-            doCollision(collideField, flagField, &tau, xlength);
+            doCollision(collideField, flagField, &tau, xlength,rank);
 
             treatBoundary(collideField, flagField, bddParams, xlength);
 
@@ -89,10 +88,9 @@ int main(int argc, char *argv[])
 
             printf("\b\b\b%02d%%", pct);
             fflush(stdout);
-
-
+*/
         }
-        printf("\b\b\b\b100%%\n");
+/*        printf("\b\b\b\b100%%\n");
         end = clock();
         time_spent = (double) (end - begin) / CLOCKS_PER_SEC;
 
@@ -102,7 +100,7 @@ int main(int argc, char *argv[])
         free(collideField);
         free(streamField);
         free(flagField);
-
+*/
     }
     finalizeMPI();
     return 0;
