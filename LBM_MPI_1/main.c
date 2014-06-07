@@ -30,6 +30,9 @@ int main(int argc, char *argv[])
     int iProc,jProc,kProc ;
     int xlength_global[3],timesteps, timestepsPerPlotting;
     double tau, bddParams[7];
+    MPI_Status status;
+
+
 
     initializeMPI(&rank,&number_of_ranks,argc,argv);
 /*  
@@ -69,8 +72,8 @@ int main(int argc, char *argv[])
             extract( sendBuffer , collideField , xlength );
 //          Swap
                         
-            swap_send_read( sendBuffer , readBuffer , xlength ,il,ir,jb,jt,kf,kb,rank);            
-/*
+            swap_send_read( sendBuffer , readBuffer , xlength ,il,ir,jb,jt,kf,kb,rank,&status);            
+
 //          Injection
             inject(readBuffer,collideField,xlength);
             doStreaming(collideField, streamField, flagField, xlength);
@@ -88,19 +91,19 @@ int main(int argc, char *argv[])
 
             printf("\b\b\b%02d%%", pct);
             fflush(stdout);
-*/
         }
-/*        printf("\b\b\b\b100%%\n");
+/*        
+        printf("\b\b\b\b100%%\n");
         end = clock();
         time_spent = (double) (end - begin) / CLOCKS_PER_SEC;
 
         printf("Running time: %.2f\n", time_spent);
         printf("MLUPS: %.3f\n", ((double) (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2) * timesteps) / (1000000.0 * time_spent));
-
+*/
         free(collideField);
         free(streamField);
         free(flagField);
-*/
+
     }
     finalizeMPI();
     return 0;
