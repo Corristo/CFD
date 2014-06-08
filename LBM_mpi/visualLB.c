@@ -4,7 +4,7 @@
 #include "computeCellValues.h"
 #include "LBDefinitions.h"
 
-void write_vtkHeader( FILE *fp, int *xlength)
+void write_vtkHeader( FILE *fp, int *xlength )
 {
     if( fp == NULL )
     {
@@ -24,11 +24,22 @@ void write_vtkHeader( FILE *fp, int *xlength)
     fprintf(fp,"\n");
 }
 
-void write_vtkPointCoordinates( FILE *fp, int *xlength)
+void write_vtkPointCoordinates( FILE *fp, int *xlength, int iCoord, int jCoord, int kCoord)
 {
-    double originX = 0.0;
-    double originY = 0.0;
-    double originZ = 0.0;
+    double originX, originY, originZ;
+//    if ( iCoord != 0)
+        originX = (double) iCoord * xlength[0] - 1;
+//    else
+//        originX = 0.0;
+//    if (jCoord != 0)
+        originY = (double) jCoord * xlength[1] - 1;
+//    else
+//        originY = 0.0;
+//    if (kCoord != 0)
+        originZ = (double) kCoord * xlength[2] - 1;
+//    else
+//        originZ = 0.0;
+
 
     int x = 0;
     int y = 0;
@@ -43,14 +54,14 @@ void write_vtkPointCoordinates( FILE *fp, int *xlength)
 }
 
 
-void writeVtkOutput(const double * const collideField, const int * const flagField, const char * filename, unsigned int t, int *xlength)
+void writeVtkOutput(const double * const collideField, const int * const flagField, const char * filename, unsigned int t, int *xlength, int rank, int iCoord, int jCoord, int kCoord)
 {
     int x, y, z, currentCellIndex;
     double cellVelocity[3], cellDensity;
 
     char szFileName[80];
     FILE *fp=NULL;
-    sprintf( szFileName, "%s.%i.vtk", filename, t );
+    sprintf( szFileName, "%sProcess%d.%i.vtk", filename, rank, t );
     fp = fopen( szFileName, "w");
     if( fp == NULL )
     {
@@ -61,7 +72,7 @@ void writeVtkOutput(const double * const collideField, const int * const flagFie
     }
 
     write_vtkHeader( fp, xlength);
-    write_vtkPointCoordinates(fp, xlength);
+    write_vtkPointCoordinates(fp, xlength, iCoord, jCoord, kCoord);
 
     fprintf(fp,"POINT_DATA %i \n", (xlength[0]) * (xlength[1]) * (xlength[2]));
 
@@ -72,8 +83,8 @@ void writeVtkOutput(const double * const collideField, const int * const flagFie
             for (x = 1; x <= xlength[0]; x++)
             {
                 currentCellIndex = PARAMQ * (z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x);
-                computeDensitySSE(collideField + currentCellIndex, &cellDensity);
-                computeVelocitySSE(collideField + currentCellIndex, &cellDensity, cellVelocity);
+                computeDensityAVX(collideField + currentCellIndex, &cellDensity);
+                computeVelocityAVX(collideField + currentCellIndex, &cellDensity, cellVelocity);
                 fprintf(fp, "%f %f %f\n", cellVelocity[0], cellVelocity[1], cellVelocity[2]);
             }
 
@@ -87,7 +98,7 @@ void writeVtkOutput(const double * const collideField, const int * const flagFie
             for (x = 1; x <= xlength[0]; x++)
             {
                 currentCellIndex = PARAMQ * (z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x);
-                computeDensitySSE(collideField + currentCellIndex, &cellDensity);
+                computeDensityAVX(collideField + currentCellIndex, &cellDensity);
                 fprintf(fp, "%f\n", cellDensity);
             }
 

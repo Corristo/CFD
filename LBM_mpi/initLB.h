@@ -7,7 +7,10 @@
 int readParameters(
     int *xlength,                       /* reads domain size. Parameter name: "xlength" */
     double *tau,                        /* relaxation parameter tau. Parameter name: "tau" */
-    double *velocityWall,               /* velocity of the lid. Parameter name: "characteristicvelocity" */
+    double *bddParams,                  /* an array of all parameters needed for boundary treatment, parameter name depends on the scenario */
+    int *iProc,                         /* number of processes in X direction */
+    int *jProc,                         /* number of processes in Y direction */
+    int *kProc,                         /* number of processes in Z direction */
     int *timesteps,                     /* number of timesteps. Parameter name: "timesteps" */
     int *timestepsPerPlotting,          /* timesteps between subsequent VTK plots. Parameter name: "vtkoutput" */
     char *problem,                      /* name of the scenario to simulate*/
@@ -18,7 +21,7 @@ int readParameters(
 
 
 /* initialises the particle distribution functions and the flagfield */
-void initialiseFields(double *collideField, double *streamField,int *flagField, int *xlength, char *problem, char *pgmInput);
+void initialiseFields(double *collideField, double *streamField,int *flagField, int *xlength, char *problem, char *pgmInput, int rank, int iProc, int jProc, int kProc);
 
 #endif
 
