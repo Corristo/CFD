@@ -6,6 +6,6 @@ void treatBoundary(double *collideField, int* flagField, const double * const bd
 
 /** compute boundary helper function */
 void compute_boundary(double *collideField, const double * const bddParams, int *flagField,
-                         int boundaryType, int *xlength, int *iList, int inum, int *const coordinate);
+                         int boundaryType, int *xlength, int *iList, int *const coordinate);
 #endif
 

@@ -1,7 +1,7 @@
 #include "initLB.h"
 #include "LBDefinitions.h"
 
-int readParameters(int *xlength, double *tau, double *bddParams, int *timesteps, int *timestepsPerPlotting, char *problem, char *pgmInput, int argc, char *argv[])
+int readParameters(int *xlength, double *tau, double *bddParams, int *iProc, int *jProc, int *kProc,  int *timesteps, int *timestepsPerPlotting, char *problem, char *pgmInput, int argc, char *argv[])
 {
     /**
     *  The array bddParams has the following structure
@@ -19,6 +19,9 @@ int readParameters(int *xlength, double *tau, double *bddParams, int *timesteps,
         read_int(argv[1], "xlength", xlength);
         read_int(argv[1], "ylength", xlength + 1);
         read_int(argv[1], "zlength", xlength + 2);
+        read_int(argv[1], "iProc", iProc);
+        read_int(argv[1], "jProc", jProc);
+        read_int(argv[1], "kProc" , kProc);
         READ_DOUBLE(argv[1], *tau);
 
         if(!strcmp(problem, "drivenCavity"))
@@ -79,10 +82,9 @@ int readParameters(int *xlength, double *tau, double *bddParams, int *timesteps,
 }
 
 
-void initialiseFields(double *collideField, double *streamField, int *flagField, int *xlength, char *problem, char* pgmInput)
+void initialiseFields(double *collideField, double *streamField, int *flagField, int *xlength, char *problem, char* pgmInput, int rank, int iProc, int jProc, int kProc)
 {
-    int i, x, y, z;
-
+    int i, j, k, x, y, z;
     for (z = 0; z <= xlength[2] + 1; z++)
         for (y = 0; y <= xlength[1] + 1; y++)
             for (x = 0; x <= xlength[0] + 1; x++)
@@ -95,42 +97,99 @@ void initialiseFields(double *collideField, double *streamField, int *flagField,
                 flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = FLUID;
             }
 
+
+    // independend of the problem first initialize all ghost cells as PARALLEL_BOUNDARY
+    {
+        /* top boundary */
+        y = xlength[1] + 1;
+        for (z = 0; z <= xlength[2] + 1; z++)
+            for (x = 0; x <= xlength[0] + 1; x++)
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = PARALLEL_BOUNDARY;
+
+
+        /* back boundary */
+        z = 0;
+        for (y = 0; y <= xlength[1] + 1; y++)
+            for (x = 0; x <= xlength[0] + 1; x++)
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = PARALLEL_BOUNDARY;
+
+        /* bottom boundary */
+        y = 0;
+        for (z = 0; z <= xlength[2] + 1; z++)
+            for (x = 0; x <= xlength[0] + 1; x++)
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = PARALLEL_BOUNDARY;
+
+        /* left boundary */
+        x = 0;
+        for (z = 0; z <= xlength[2] + 1; z++)
+            for (y = 0; y <= xlength[1] + 1; y++)
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = PARALLEL_BOUNDARY;
+
+        /* right boundary */
+        x = xlength[0] + 1;
+        for (z = 0; z <= xlength[2] + 1; z++)
+            for (y = 0; y <= xlength[1] + 1; y++)
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = PARALLEL_BOUNDARY;
+
+        /* front boundary, i.e. z = xlength + 1 */
+        z = xlength[2] + 1;
+        for (y = 0; y <= xlength[1] + 1; y++)
+            for (x = 0; x <= xlength[0] + 1; x++)
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = PARALLEL_BOUNDARY;
+    }
+
+    /** initialization of different scenarios */
+    // only the drivenCavity scenario is adjusted for the parallelized version
+
+    i = rank % iProc;
+    j = ((rank - i) / iProc) % jProc;
+    k = (rank - i - iProc * j) / (iProc * jProc);
+
     if (!strcmp(problem, "drivenCavity"))
     {
         /* top boundary */
         y = xlength[1] + 1;
         for (z = 0; z <= xlength[2] + 1; z++)
             for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = MOVING_WALL;
+                if (j == jProc - 1)
+                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = MOVING_WALL;
+
+
         /* back boundary */
         z = 0;
         for (y = 0; y <= xlength[1] + 1; y++)
             for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+                if (k == 0)
+                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
 
         /* bottom boundary */
         y = 0;
         for (z = 0; z <= xlength[2] + 1; z++)
             for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+                if (j == 0)
+                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+
 
         /* left boundary */
         x = 0;
         for (z = 0; z <= xlength[2] + 1; z++)
             for (y = 0; y <= xlength[1] + 1; y++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+                if (i == 0)
+                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
 
         /* right boundary */
         x = xlength[0] + 1;
         for (z = 0; z <= xlength[2] + 1; z++)
             for (y = 0; y <= xlength[1] + 1; y++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+                if (i == iProc - 1)
+                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
 
         /* front boundary, i.e. z = xlength + 1 */
         z = xlength[2] + 1;
         for (y = 0; y <= xlength[1] + 1; y++)
             for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+                if (k == kProc - 1)
+                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
     }
 
     if (!strcmp(problem, "tiltedPlate"))
@@ -143,13 +202,13 @@ void initialiseFields(double *collideField, double *streamField, int *flagField,
                     flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = pgmImage[x][y];
         free_imatrix(pgmImage, 0, xlength[0] + 2, 0, xlength[1] + 2);
 
-         /* front boundary, i.e. z = xlength + 1 */
+        /* front boundary, i.e. z = xlength + 1 */
         z = xlength[2] + 1;
         for (y = 0; y <= xlength[1] + 1; y++)
             for (x = 0; x <= xlength[0] + 1; x++)
                 flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = FREE_SLIP;
 
-         /* back boundary */
+        /* back boundary */
         z = 0;
         for (y = 0; y <= xlength[1] + 1; y++)
             for (x = 0; x <= xlength[0] + 1; x++)
@@ -211,7 +270,7 @@ void initialiseFields(double *collideField, double *streamField, int *flagField,
                 flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = OUTFLOW;
 
 
-         /* top boundary */
+        /* top boundary */
         y = xlength[1] + 1;
         for (z = 0; z <= xlength[2] + 1; z++)
             for (x = 0; x <= xlength[0] + 1; x++)
@@ -234,7 +293,7 @@ void initialiseFields(double *collideField, double *streamField, int *flagField,
     if (!strcmp(problem, "planeShearFlow"))
     {
 
-         /* front boundary, i.e. z = xlength + 1 */
+        /* front boundary, i.e. z = xlength + 1 */
         z = xlength[2] + 1;
         for (y = 0; y <= xlength[1] + 1; y++)
             for (x = 0; x <= xlength[0] + 1; x++)

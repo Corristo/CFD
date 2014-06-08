@@ -72,8 +72,8 @@ void writeVtkOutput(const double * const collideField, const int * const flagFie
             for (x = 1; x <= xlength[0]; x++)
             {
                 currentCellIndex = PARAMQ * (z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x);
-                computeDensitySSE(collideField + currentCellIndex, &cellDensity);
-                computeVelocitySSE(collideField + currentCellIndex, &cellDensity, cellVelocity);
+                computeDensityAVX(collideField + currentCellIndex, &cellDensity);
+                computeVelocityAVX(collideField + currentCellIndex, &cellDensity, cellVelocity);
                 fprintf(fp, "%f %f %f\n", cellVelocity[0], cellVelocity[1], cellVelocity[2]);
             }
 
@@ -87,7 +87,7 @@ void writeVtkOutput(const double * const collideField, const int * const flagFie
             for (x = 1; x <= xlength[0]; x++)
             {
                 currentCellIndex = PARAMQ * (z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x);
-                computeDensitySSE(collideField + currentCellIndex, &cellDensity);
+                computeDensityAVX(collideField + currentCellIndex, &cellDensity);
                 fprintf(fp, "%f\n", cellDensity);
             }
 
