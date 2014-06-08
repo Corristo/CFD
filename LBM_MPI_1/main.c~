@@ -32,8 +32,6 @@ int main(int argc, char *argv[])
     double tau, bddParams[7];
     MPI_Status status;
 
-
-
     initializeMPI(&rank,&number_of_ranks,argc,argv);
 /*  
     printf("rank = %d \n" , rank);
@@ -72,7 +70,7 @@ int main(int argc, char *argv[])
             extract( sendBuffer , collideField , xlength );
 //          Swap
                         
-            swap_send_read( sendBuffer , readBuffer , xlength ,il,ir,jb,jt,kf,kb,rank);            
+            swap_send_read( sendBuffer , readBuffer , xlength ,il,ir,jb,jt,kf,kb,rank,&status);            
 
 //          Injection
             inject(readBuffer,collideField,xlength);

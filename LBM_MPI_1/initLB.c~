@@ -529,19 +529,19 @@ void swap_send_read( double**sendBuffer ,double**readBuffer ,int*xlength,int il,
    MPI_Status status;
    
    MPI_Send( sendBuffer[0], size_x, MPI_DOUBLE, ir, 1, MPI_COMM_WORLD );
-   MPI_Recv( readBuffer[1], size_x, MPI_DOUBLE, il, 1, MPI_COMM_WORLD, &status );
+   MPI_Recv( readBuffer[1], size_x, MPI_DOUBLE, il, 1, MPI_COMM_WORLD, status );
    MPI_Send( sendBuffer[1], size_x, MPI_DOUBLE, il, 1, MPI_COMM_WORLD );
-   MPI_Recv( readBuffer[0], size_x, MPI_DOUBLE, ir, 1, MPI_COMM_WORLD, &status );
+   MPI_Recv( readBuffer[0], size_x, MPI_DOUBLE, ir, 1, MPI_COMM_WORLD, status );
    
    MPI_Send( sendBuffer[2], size_y, MPI_DOUBLE, jt, 1, MPI_COMM_WORLD );
-   MPI_Recv( readBuffer[3], size_y, MPI_DOUBLE, jb, 1, MPI_COMM_WORLD, &status );
+   MPI_Recv( readBuffer[3], size_y, MPI_DOUBLE, jb, 1, MPI_COMM_WORLD, status );
    MPI_Send( sendBuffer[3], size_y, MPI_DOUBLE, jt, 1, MPI_COMM_WORLD );
-   MPI_Recv( readBuffer[2], size_y, MPI_DOUBLE, jb, 1, MPI_COMM_WORLD, &status );
+   MPI_Recv( readBuffer[2], size_y, MPI_DOUBLE, jb, 1, MPI_COMM_WORLD, status );
    
    MPI_Send( sendBuffer[4], size_z, MPI_DOUBLE, kf, 1, MPI_COMM_WORLD );
-   MPI_Recv( readBuffer[5], size_z, MPI_DOUBLE, kb, 1, MPI_COMM_WORLD, &status );
+   MPI_Recv( readBuffer[5], size_z, MPI_DOUBLE, kb, 1, MPI_COMM_WORLD, status );
    MPI_Send( sendBuffer[5], size_z, MPI_DOUBLE, kf, 1, MPI_COMM_WORLD );
-   MPI_Recv( readBuffer[4], size_z, MPI_DOUBLE, kb, 1, MPI_COMM_WORLD, &status );
+   MPI_Recv( readBuffer[4], size_z, MPI_DOUBLE, kb, 1, MPI_COMM_WORLD, status );
 }
 
 void  inject(double**readBuffer,double*collideField,int*xlength)

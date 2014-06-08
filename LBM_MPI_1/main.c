@@ -32,8 +32,6 @@ int main(int argc, char *argv[])
     double tau, bddParams[7];
     MPI_Status status;
 
-
-
     initializeMPI(&rank,&number_of_ranks,argc,argv);
 /*  
     printf("rank = %d \n" , rank);
@@ -64,7 +62,7 @@ int main(int argc, char *argv[])
         int il,ir,jb,jt,kf,kb;
         decideneighbours(&il,&ir,&jb,&jt,&kf,&kb,iProc,jProc,kProc,rank,xlength);
         
-        for(int t = 0; t < 1; t++)
+        for(int t = 0; t < timesteps; t++)
         {
             double *swap = NULL;
             

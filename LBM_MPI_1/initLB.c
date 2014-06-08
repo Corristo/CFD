@@ -526,7 +526,6 @@ void decideneighbours(int*il,int*ir,int*jb,int*jt,int*kf,int*kb,int iProc,int jP
 void swap_send_read( double**sendBuffer ,double**readBuffer ,int*xlength,int il,int ir,int jb,int jt,int kf,int kb,int myrank,MPI_Status *status)
 {
    int size_x = 5 * ((xlength[1]+2)*(xlength[2]+2)),size_y=5*((xlength[0]+2)*(xlength[2]+2)),size_z=5*((xlength[0]+2)*(xlength[1]+2)) ;
-   MPI_Status status;
    
    MPI_Send( sendBuffer[0], size_x, MPI_DOUBLE, ir, 1, MPI_COMM_WORLD );
    MPI_Recv( readBuffer[1], size_x, MPI_DOUBLE, il, 1, MPI_COMM_WORLD, status );

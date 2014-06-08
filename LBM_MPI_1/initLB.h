@@ -1,7 +1,7 @@
 #ifndef _INITLB_H_
 #define _INITLB_H_
 #include "helper.h"
-
+#include <mpi.h>
 
 /* reads the parameters for the lid driven cavity scenario from a config file */
 int readParameters(
@@ -27,7 +27,7 @@ void extract(double*(sendBuffer[]),double*collideField,int*xlength);
 
 void decideneighbours(int*il,int*ir,int*jb,int*jt,int*kf,int*kb,int iProc,int jProc,int kProc,int rank,int *xlength);
 
-void swap_send_read( double**sendBuffer ,double**readBuffer ,int*xlength,int il,int ir,int jb,int jt,int kf,int kb,int rank);
+void swap_send_read( double**sendBuffer ,double**readBuffer ,int*xlength,int il,int ir,int jb,int jt,int kf,int kb,int myrank,MPI_Status *status);
 
 void  inject(double**readBuffer,double*collideField,int*xlength);
 
