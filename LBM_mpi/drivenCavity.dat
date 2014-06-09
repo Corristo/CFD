@@ -1,7 +1,7 @@
 problem     drivenCavity
-xlength 	10
-ylength 	10
-zlength		20
+xlength 	5
+ylength 	5
+zlength		10
 iProc       2
 jProc       2
 kProc       1

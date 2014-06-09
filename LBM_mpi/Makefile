@@ -5,13 +5,13 @@ SOURCES=initLB.c visualLB.c boundary.c collision.c streaming.c computeCellValues
 # --------
 CC=mpicc
 
-CFLAGS=-pedantic -Wall -std=gnu99  -Ofast -msse3 -mavx -funroll-loops -g -pg
+CFLAGS=-pedantic -Wall -std=gnu99  -Ofast -msse3 -mavx -funroll-loops
 
 
 
 # Linker flags
 # ------------
-LDFLAGS=-pg
+LDFLAGS=
 
 OBJECTS=$(SOURCES:.c=.o)
 EXECUTABLE=lbsim

@@ -44,12 +44,19 @@ int main(int argc, char *argv[])
     sendBuffer[0] = sendBuffer[1] = sendBuffer[2] = sendBuffer[3] = sendBuffer[4] = sendBuffer[5] = NULL;
     readBuffer[0] = readBuffer[1] = readBuffer[2] = readBuffer[3] = readBuffer[4] = readBuffer[5] = NULL;
 
-    MPI_Init( &argc, &argv );                               /* execute n processes      */
+    MPI_Init( &argc, &argv );
     MPI_Comm_size( MPI_COMM_WORLD, &number_of_ranks );      /* asking for the number of processes  */
     MPI_Comm_rank( MPI_COMM_WORLD, &rank );                 /* asking for the local process id   */
 
     if(readParameters(xlength, &tau, bddParams, &iProc, &jProc, &kProc, &timesteps, &timestepsPerPlotting, problem, pgmInput, argc, argv) == 0)
     {
+        if (number_of_ranks != iProc * jProc * kProc)
+        {
+            if (rank == 0)
+                printf("ERROR: number of processes started does not match the number specified in the input file!\n");
+            MPI_Barrier( MPI_COMM_WORLD);
+            MPI_Abort(MPI_COMM_WORLD, 0);
+        }
         begin = clock();
         time_t start = time(NULL);
         collideField = (double*) malloc((size_t) sizeof(double) * PARAMQ * (xlength[0] + 2)*(xlength[1] + 2)*(xlength[2] + 2));
@@ -108,14 +115,71 @@ int main(int argc, char *argv[])
 
         initialiseFields(collideField, streamField, flagField, xlength, problem, pgmInput, rank, iProc, jProc, kProc);
 
-        writeVtkOutput(streamField, flagField, "./Paraview/output", 0, xlength, rank, iCoord, jCoord, kCoord);
+        /** debugging code, checking the flagField */
+//        int exactFlagField[(iProc * xlength[0] + 2) *  (jProc * xlength[1] + 2) * (kProc * xlength[2] + 2)];
+//        FILE *fp2 = NULL;
+//        unsigned int line2 = 0;
+//        int error2 = 0;
+//        char szFileName2[80];
+//        sprintf( szFileName2, "Testdata/%s/flagField.dat", problem );
+//        fp2 = fopen(szFileName2,"r");
+//        if (fp2 != NULL)
+//        {
+//            for (line2 = 0; line2 < (iProc * xlength[0] + 2) *  (jProc * xlength[1] + 2) * (kProc * xlength[2] + 2); line2++)
+//                fscanf(fp2,"%d",&exactFlagField[line2]);
+//        }
+//        fclose(fp2);
+//        for (z = 1; z <= xlength[2]; z++)
+//            for (y = 1; y <= xlength[1]; y++)
+//                for(x = 1; x <= xlength[0]; x++)
+//                    for (i = 0; i < PARAMQ; i++)
+//                        if (flagField[(z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x)] != exactFlagField[((z + kCoord * xlength[2]) * (xlength[0] * iProc + 2) * (xlength[1] * jProc + 2) + (y + jCoord * xlength[1]) * (xlength[0] * iProc + 2) + (x + iCoord * xlength[0]))])
+//                            error2 = 1;
+//
+//
+//        if (error2)
+//            printf("ERROR: Process %d has a different flagField\n",rank);
+        /** debugging code end */
+
         if (!rank)
             printf("Progress:     ");
         for(int t = 0; t < timesteps; t++)
         {
             double *swap = NULL;
-            if (rightNeighbour >= 0)
+
+            if (rightNeighbour >= 0 && leftNeighbour >= 0)
             {
+                // both left and right neighbours
+                // Extraction at right boundary
+                for (z = 1; z <= xlength[2]; z++)
+                    for (y = 1; y <= xlength[1]; y++)
+                        for (i = 0; i < 5; i++)
+                            sendBuffer[1][5 * ((xlength[1] + 2) * z + y) + i] = collideField[PARAMQ * (z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + xlength[0]) + VELOCITIESRIGHTOUT[i]];
+                // Swap
+                MPI_Sendrecv( sendBuffer[1], 5 * (xlength[1] + 2) * (xlength[2] + 2), MPI_DOUBLE, rightNeighbour, 1, readBuffer[1], 5 * (xlength[1] + 2) * (xlength[2] + 2), MPI_DOUBLE, leftNeighbour, 1, MPI_COMM_WORLD, &mpistatus );
+                // Injection at left boundary
+                for (z = 1; z <= xlength[2]; z++)
+                    for (y = 1; y <= xlength[1]; y++)
+                        if (flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2)] == PARALLEL_BOUNDARY)
+                            for (i = 0; i < 5; i++)
+                                collideField[PARAMQ * (z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2)) + VELOCITIESRIGHTOUT[i]] = readBuffer[1][5 * ((xlength[1] + 2) * z + y) + i];
+                // Extraction at left boundary
+                for (z = 1; z <= xlength[2]; z++)
+                    for (y = 1; y <= xlength[1]; y++)
+                        for (i = 0; i < 5; i++)
+                            sendBuffer[0][5 * ((xlength[1] + 2) * z + y) + i] = collideField[PARAMQ * (z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + 1) + VELOCITIESLEFTOUT[i]];
+                MPI_Sendrecv( sendBuffer[0], 5 * (xlength[1] + 2) * (xlength[2] + 2), MPI_DOUBLE, leftNeighbour, 0, readBuffer[0], 5 * (xlength[1] + 2) * (xlength[2] + 2), MPI_DOUBLE, rightNeighbour, 0, MPI_COMM_WORLD, &mpistatus );
+                // Injection at right boundary
+                for (z = 1; z <= xlength[2]; z++)
+                    for (y = 1; y <= xlength[1]; y++)
+                        if (flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + xlength[0] + 1] == PARALLEL_BOUNDARY)
+                            for (i = 0; i < 5; i++)
+                                collideField[PARAMQ * (z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + xlength[0] + 1) + VELOCITIESLEFTOUT[i]] = readBuffer[0][5 * ((xlength[1] + 2) * z + y) + i];
+
+            }
+            else if (rightNeighbour >= 0)
+            {
+                // no left neighbour
                 // Extraction at right boundary
                 for (z = 1; z <= xlength[2]; z++)
                     for (y = 1; y <= xlength[1]; y++)
@@ -129,10 +193,10 @@ int main(int argc, char *argv[])
                         if (flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + xlength[0] + 1] == PARALLEL_BOUNDARY)
                             for (i = 0; i < 5; i++)
                                 collideField[PARAMQ * (z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + xlength[0] + 1) + VELOCITIESLEFTOUT[i]] = readBuffer[0][5 * ((xlength[1] + 2) * z + y) + i];
-
             }
-            if (leftNeighbour >= 0)
+            else if (leftNeighbour >= 0)
             {
+                // no right neighbour
                 // Extraction at left boundary
                 for (z = 1; z <= xlength[2]; z++)
                     for (y = 1; y <= xlength[1]; y++)
@@ -146,9 +210,39 @@ int main(int argc, char *argv[])
                         if (flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2)] == PARALLEL_BOUNDARY)
                             for (i = 0; i < 5; i++)
                                 collideField[PARAMQ * (z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2)) + VELOCITIESRIGHTOUT[i]] = readBuffer[1][5 * ((xlength[1] + 2) * z + y) + i];
+            }
+
+            if (frontNeighbour >= 0 && backNeighbour >= 0)
+            {
+                // Extraction at front boundary
+                for ( y = 1; y <= xlength[1]; y++)
+                    for (x = 0; x <= xlength[0] + 1; x++ )
+                        for (i = 0; i < 5; i++)
+                            sendBuffer[4][5 * ((xlength[0] + 2) * y + x) + i] = collideField[PARAMQ * (xlength[2] * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + VELOCITIESFRONTOUT[i]];
+                // Swap
+                MPI_Sendrecv( sendBuffer[4], 5 * (xlength[0] + 2) * (xlength[1] + 2), MPI_DOUBLE, frontNeighbour, 4, readBuffer[4], 5 * (xlength[0] + 2) * (xlength[1] + 2), MPI_DOUBLE, backNeighbour, 4,  MPI_COMM_WORLD, &mpistatus );
+                // Injection at back boundary
+                for ( y = 1; y <= xlength[1]; y++)
+                    for (x = 0; x <= xlength[0] + 1; x++ )
+                        if (flagField[y * (xlength[0] + 2) + x] == PARALLEL_BOUNDARY)
+                            for (i = 0; i < 5; i++)
+                                collideField[PARAMQ * (y * (xlength[0] + 2) + x) + VELOCITIESFRONTOUT[i]] = readBuffer[4][5 * ((xlength[0] + 2) * y + x) + i];
+                // Extraction at back boundary
+                for ( y = 1; y <= xlength[1]; y++)
+                    for (x = 0; x <= xlength[0] + 1; x++ )
+                        for (i = 0; i < 5; i++)
+                            sendBuffer[5][5 * ((xlength[0] + 2) * y + x) + i] = collideField[PARAMQ * ((xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + VELOCITIESBACKOUT[i]];
+                // Swap
+                MPI_Sendrecv( sendBuffer[5], 5 * (xlength[0] + 2) * (xlength[1] + 2), MPI_DOUBLE, backNeighbour, 5, readBuffer[5], 5 * (xlength[0] + 2) * (xlength[1] + 2), MPI_DOUBLE, frontNeighbour, 5,  MPI_COMM_WORLD, &mpistatus );
+                // Injection at front boundary
+                for ( y = 1; y <= xlength[1]; y++)
+                    for (x = 0; x <= xlength[0] + 1; x++ )
+                        if (flagField[(xlength[2] + 1) * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] == PARALLEL_BOUNDARY)
+                            for (i = 0; i < 5; i++)
+                                collideField[PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + VELOCITIESBACKOUT[i]] = readBuffer[5][5 * ((xlength[0] + 2) * y + x) + i];
 
             }
-            if (frontNeighbour >= 0)
+            else if (frontNeighbour >= 0)
             {
                 // Extraction at front boundary
                 for ( y = 1; y <= xlength[1]; y++)
@@ -164,7 +258,7 @@ int main(int argc, char *argv[])
                             for (i = 0; i < 5; i++)
                                 collideField[PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + VELOCITIESBACKOUT[i]] = readBuffer[5][5 * ((xlength[0] + 2) * y + x) + i];
             }
-            if (backNeighbour >= 0)
+            else if (backNeighbour >= 0)
             {
                 // Extraction at back boundary
                 for ( y = 1; y <= xlength[1]; y++)
@@ -180,7 +274,38 @@ int main(int argc, char *argv[])
                             for (i = 0; i < 5; i++)
                                 collideField[PARAMQ * (y * (xlength[0] + 2) + x) + VELOCITIESFRONTOUT[i]] = readBuffer[4][5 * ((xlength[0] + 2) * y + x) + i];
             }
-            if (topNeighbour >= 0)
+//
+            if (topNeighbour >= 0 && bottomNeighbour >= 0)
+            {
+                // Extraction at top boundary
+                for (z = 0; z <= xlength[2] + 1; z++ )
+                    for (x = 0; x <= xlength[0] + 1; x++ )
+                        for ( i = 0; i < 5; i++ )
+                            sendBuffer[2][5 * ( z * (xlength[0] + 2) + x) + i] = collideField[PARAMQ * (z * (xlength[0] + 2) * (xlength[1] + 2) + xlength[1] * (xlength[0] + 2) + x) + VELOCITIESTOPOUT[i]];
+                // Swap
+                MPI_Sendrecv( sendBuffer[2], 5 * (xlength[0] + 2) * (xlength[2] + 2), MPI_DOUBLE, topNeighbour, 2, readBuffer[2], 5 * (xlength[0] + 2) * (xlength[2] + 2), MPI_DOUBLE, bottomNeighbour, 2, MPI_COMM_WORLD, &mpistatus );
+                // Injection at bottom boundary
+                for (z = 0; z <= xlength[2] + 1; z++ )
+                    for (x = 0; x <= xlength[0] + 1; x++ )
+                        if (flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + x] == PARALLEL_BOUNDARY)
+                            for ( i = 0; i < 5; i++ )
+                                collideField[PARAMQ * (z * (xlength[0] + 2) * (xlength[1] + 2) + x) + VELOCITIESTOPOUT[i]] = readBuffer[2][5 * ( z * (xlength[0] + 2) + x) + i];
+                // Extraction at bottom boundary
+                for (z = 0; z <= xlength[2] + 1; z++ )
+                    for (x = 0; x <= xlength[0] + 1; x++ )
+                        for ( i = 0; i < 5; i++ )
+                            sendBuffer[3][5 * ( z * (xlength[0] + 2) + x) + i] = collideField[PARAMQ * (z * (xlength[0] + 2) * (xlength[1] + 2) + (xlength[0] + 2) + x) + VELOCITIESBOTTOMOUT[i]];
+                // Swap
+                MPI_Sendrecv( sendBuffer[3], 5 * (xlength[0] + 2) * (xlength[2] + 2), MPI_DOUBLE, bottomNeighbour, 3, readBuffer[3], 5 * (xlength[0] + 2) * (xlength[2] + 2), MPI_DOUBLE, topNeighbour, 3, MPI_COMM_WORLD, &mpistatus );
+                // Injection at top boundary
+                for (z = 0; z <= xlength[2] + 1; z++ )
+                    for (x = 0; x <= xlength[0] + 1; x++ )
+                        if (flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x] == PARALLEL_BOUNDARY)
+                            for ( i = 0; i < 5; i++ )
+                                collideField[PARAMQ * (z * (xlength[0] + 2) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + VELOCITIESBOTTOMOUT[i]] = readBuffer[3][5 * ( z * (xlength[0] + 2) + x) + i];
+
+            }
+            else if (topNeighbour >= 0)
             {
                 // Extraction at top boundary
                 for (z = 0; z <= xlength[2] + 1; z++ )
@@ -197,7 +322,7 @@ int main(int argc, char *argv[])
                                 collideField[PARAMQ * (z * (xlength[0] + 2) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + VELOCITIESBOTTOMOUT[i]] = readBuffer[3][5 * ( z * (xlength[0] + 2) + x) + i];
 
             }
-            if (bottomNeighbour >= 0)
+            else if (bottomNeighbour >= 0)
             {
                 // Extraction at bottom boundary
                 for (z = 0; z <= xlength[2] + 1; z++ )
@@ -224,8 +349,8 @@ int main(int argc, char *argv[])
             doCollision(collideField, flagField, &tau, xlength);
             treatBoundary(collideField, flagField, bddParams, xlength);
 
-            if (t % timestepsPerPlotting == 0)
-                writeVtkOutput(collideField, flagField, "./Paraview/output", (unsigned int) t / timestepsPerPlotting, xlength, rank, iCoord, jCoord, kCoord);
+//            if (t % timestepsPerPlotting == 0)
+//                writeVtkOutput(collideField, flagField, "./Paraview/output", (unsigned int) t / timestepsPerPlotting, xlength, rank, iCoord, jCoord, kCoord);
 
             if (!rank)
             {
@@ -233,6 +358,35 @@ int main(int argc, char *argv[])
                 printf("\b\b\b%02d%%", pct);
                 fflush(stdout);
             }
+
+            /** debugging code */
+            /* check correctness of collideField with reference data */
+//            if (t % timestepsPerPlotting == 0)
+//            {
+//                double exactCollideField[PARAMQ * (iProc * xlength[0] + 2) *  (jProc * xlength[1] + 2) * (kProc * xlength[2] + 2)];
+//                FILE *fp = NULL;
+//                unsigned int line = 0;
+//                int error = 0;
+//                char szFileName[80];
+//                sprintf( szFileName, "Testdata/%s/%i.dat", problem, t / timestepsPerPlotting );
+//                fp = fopen(szFileName,"r");
+//                if (fp != NULL)
+//                {
+//                    for (line = 0; line < PARAMQ * (iProc * xlength[0] + 2) *  (jProc * xlength[1] + 2) * (kProc * xlength[2] + 2); line++)
+//                        fscanf(fp,"%lf",&exactCollideField[line]);
+//                }
+//                fclose(fp);
+//                for (z = 1; z <= xlength[2]; z++)
+//                    for (y = 1; y <= xlength[1]; y++)
+//                        for(x = 1; x <= xlength[0]; x++)
+//                            for (i = 0; i < PARAMQ; i++)
+//                                if (fabs(collideField[PARAMQ * (z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i] - exactCollideField[PARAMQ * ((z + kCoord * xlength[2]) * (xlength[0] * iProc + 2) * (xlength[1] * jProc + 2) + (y + jCoord * xlength[1]) * (xlength[0] * iProc + 2) + (x + iCoord * xlength[0])) + i]) > 1e-5)
+//                                    error = 1;
+//                if (error)
+//                    printf("ERROR: Process %d has a different collideField in timestep %d\n",rank, t);
+//            }
+            /** end of debugging code */
+
 
         }
         MPI_Barrier(MPI_COMM_WORLD);

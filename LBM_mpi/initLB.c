@@ -147,49 +147,53 @@ void initialiseFields(double *collideField, double *streamField, int *flagField,
 
     if (!strcmp(problem, "drivenCavity"))
     {
-        /* top boundary */
-        y = xlength[1] + 1;
-        for (z = 0; z <= xlength[2] + 1; z++)
-            for (x = 0; x <= xlength[0] + 1; x++)
-                if (j == jProc - 1)
-                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = MOVING_WALL;
 
+         /* top boundary */
+        y = xlength[1] + 1;
+        if (j == jProc - 1)
+            for (z = 0; z <= xlength[2] + 1; z++)
+                for (x = 0; x <= xlength[0] + 1; x++)
+                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = MOVING_WALL;
 
         /* back boundary */
         z = 0;
-        for (y = 0; y <= xlength[1] + 1; y++)
-            for (x = 0; x <= xlength[0] + 1; x++)
-                if (k == 0)
+        if (k == 0)
+            for (y = 0; y <= xlength[1] + 1; y++)
+                for (x = 0; x <= xlength[0] + 1; x++)
+
                     flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
 
         /* bottom boundary */
         y = 0;
-        for (z = 0; z <= xlength[2] + 1; z++)
-            for (x = 0; x <= xlength[0] + 1; x++)
-                if (j == 0)
+        if (j == 0)
+            for (z = 0; z <= xlength[2] + 1; z++)
+                for (x = 0; x <= xlength[0] + 1; x++)
+
                     flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
 
 
         /* left boundary */
         x = 0;
-        for (z = 0; z <= xlength[2] + 1; z++)
-            for (y = 0; y <= xlength[1] + 1; y++)
-                if (i == 0)
+        if (i == 0)
+            for (z = 0; z <= xlength[2] + 1; z++)
+                for (y = 0; y <= xlength[1] + 1; y++)
                     flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
 
         /* right boundary */
         x = xlength[0] + 1;
-        for (z = 0; z <= xlength[2] + 1; z++)
-            for (y = 0; y <= xlength[1] + 1; y++)
-                if (i == iProc - 1)
+        if (i == iProc - 1)
+            for (z = 0; z <= xlength[2] + 1; z++)
+                for (y = 0; y <= xlength[1] + 1; y++)
                     flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
 
         /* front boundary, i.e. z = xlength + 1 */
         z = xlength[2] + 1;
-        for (y = 0; y <= xlength[1] + 1; y++)
-            for (x = 0; x <= xlength[0] + 1; x++)
-                if (k == kProc - 1)
+        if (k == kProc - 1)
+            for (y = 0; y <= xlength[1] + 1; y++)
+                for (x = 0; x <= xlength[0] + 1; x++)
                     flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+
+
     }
 
     if (!strcmp(problem, "tiltedPlate"))
@@ -199,95 +203,191 @@ void initialiseFields(double *collideField, double *streamField, int *flagField,
         for (z = 1; z <= xlength[2]; z++)
             for (y = 1; y <= xlength[1]; y++)
                 for (x = 1; x <= xlength[0]; x++)
-                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = pgmImage[x][y];
-        free_imatrix(pgmImage, 0, xlength[0] + 2, 0, xlength[1] + 2);
+                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = pgmImage[xlength[0] * i + x][xlength[1] * j + y];
+
 
         /* front boundary, i.e. z = xlength + 1 */
         z = xlength[2] + 1;
-        for (y = 0; y <= xlength[1] + 1; y++)
-            for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = FREE_SLIP;
+        if (k == kProc - 1)
+            for (y = 0; y <= xlength[1] + 1; y++)
+                for (x = 0; x <= xlength[0] + 1; x++)
+
+                {
+                    // check for obstacle in the cell in the inner part of the domain adjacent to the boundary (i.e. NO_SLIP)
+                    // if there is an obstacle, make the boundary NO_SLIP as well
+                    if (!flagField[(z - 1) * (xlength[0] + 2) * (xlength[1] + 2) + (xlength[0] + 2) * y + x])
+                        flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = FREE_SLIP;
+                    else
+                        flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+                }
 
         /* back boundary */
         z = 0;
-        for (y = 0; y <= xlength[1] + 1; y++)
-            for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = FREE_SLIP;
+        if (k == 0)
+            for (y = 0; y <= xlength[1] + 1; y++)
+                for (x = 0; x <= xlength[0] + 1; x++)
+                {
+                    // check for obstacle in the cell in the inner part of the domain adjacent to the boundary (i.e. NO_SLIP)
+                    // if there is an obstacle, make the boundary NO_SLIP as well
+                    if (!flagField[(z + 1) * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x])
+                        flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = FREE_SLIP;
+                    else
+                        flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+                }
 
 
         /* left boundary */
         x = 0;
-        for (z = 0; z <= xlength[2] + 1; z++)
-            for (y = 0; y <= xlength[1] + 1; y++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = INFLOW;
+        if (i == 0)
+            for (z = 0; z <= xlength[2] + 1; z++)
+                for (y = 0; y <= xlength[1] + 1; y++)
+                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = INFLOW;
 
         /* right boundary */
         x = xlength[0] + 1;
-        for (z = 0; z <= xlength[2] + 1; z++)
-            for (y = 0; y <= xlength[1] + 1; y++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = OUTFLOW;
+        if (i == iProc - 1)
+            for (z = 0; z <= xlength[2] + 1; z++)
+                for (y = 0; y <= xlength[1] + 1; y++)
+                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = OUTFLOW;
 
 
         /* top boundary */
         y = xlength[1] + 1;
+        if (j == jProc - 1)
+            for (z = 0; z <= xlength[2] + 1; z++)
+                for (x = 0; x <= xlength[0] + 1; x++)
+                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+
+        /* bottom boundary */
+        y = 0;
+        if (j == 0)
+            for (z = 0; z <= xlength[2] + 1; z++)
+                for (x = 0; x <= xlength[0] + 1; x++)
+                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+
+
+        // Adjust PARALLEL_BOUNDARY if the "adjacent" cell in the domain of the neighbouring process is an obstacle cell
+        /* top boundary */
+        y = xlength[1] + 1;
         for (z = 0; z <= xlength[2] + 1; z++)
             for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+                if (flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] == PARALLEL_BOUNDARY && pgmImage[xlength[0] * i + x][xlength[1] * j + y + 1])
+                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
 
         /* bottom boundary */
         y = 0;
         for (z = 0; z <= xlength[2] + 1; z++)
             for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+                if (flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] == PARALLEL_BOUNDARY && pgmImage[xlength[0] * i + x][xlength[1] * j + y - 1])
+                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+
+        /* left boundary */
+        x = 0;
+        for (z = 0; z <= xlength[2] + 1; z++)
+            for (y = 0; y <= xlength[1] + 1; y++)
+                if (flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] == PARALLEL_BOUNDARY && pgmImage[xlength[0] * i + x - 1][xlength[1] * j + y])
+                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+
+        /* right boundary */
+        x = xlength[0] + 1;
+        for (z = 0; z <= xlength[2] + 1; z++)
+            for (y = 0; y <= xlength[1] + 1; y++)
+                if (flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] == PARALLEL_BOUNDARY && pgmImage[xlength[0] * i + x + 1][xlength[1] * j + y])
+                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+
+        free_imatrix(pgmImage, 0, xlength[0] + 2, 0, xlength[1] + 2);
 
     }
     if (!strcmp(problem, "flowStep"))
     {
-
-
         /* front boundary, i.e. z = xlength + 1 */
         z = xlength[2] + 1;
+        if (k == kProc - 1)
         for (y = 0; y <= xlength[1] + 1; y++)
             for (x = 0; x <= xlength[0] + 1; x++)
                 flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
 
         /* back boundary */
         z = 0;
+        if (k == 0)
         for (y = 0; y <= xlength[1] + 1; y++)
             for (x = 0; x <= xlength[0] + 1; x++)
                 flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
 
         /* left boundary */
         x = 0;
+        if (i == 0)
         for (z = 0; z <= xlength[2] + 1; z++)
             for (y = 0; y <= xlength[1] + 1; y++)
                 flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = INFLOW;
 
         /* right boundary */
         x = xlength[0] + 1;
+        if (i == iProc - 1)
         for (z = 0; z <= xlength[2] + 1; z++)
             for (y = 0; y <= xlength[1] + 1; y++)
                 flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = OUTFLOW;
 
-
         /* top boundary */
         y = xlength[1] + 1;
+        if (j == jProc - 1)
         for (z = 0; z <= xlength[2] + 1; z++)
             for (x = 0; x <= xlength[0] + 1; x++)
                 flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
 
         /* bottom boundary */
         y = 0;
+        if (j == 0)
         for (z = 0; z <= xlength[2] + 1; z++)
             for (x = 0; x <= xlength[0] + 1; x++)
                 flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
 
 
         /* step */
-        for (z = 1; z <= xlength[2]; z++)
-            for (y = 1; y <= xlength[1]/2; y++) /* integer division on purpose, half of the channel is blocked by step */
-                for (x = 1; x <= xlength[1]/2; x++)
+        // step height & width: jProc * xlength[1] / 2
+//        if (j * xlength[1] < jProc * xlength[1] / 2 && i * xlength[0] < jProc * xlength[1])
+            for (z = 0; z <= xlength[2] + 1; z++)
+                for (y = 0; y <= min(jProc * xlength[1] / 2 - j * xlength[1], xlength[1] + 1) ; y++) /* integer division on purpose, half of the channel is blocked by step */
+                    for (x = 0; x <= min(jProc * xlength[1] / 2 - i * xlength[0], xlength[0] + 1); x++)
+                        flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+
+        // adjust the PARALLEL_BOUNDARY where "adjacent" cells in the neighbouring domain are NO_SLIP
+        /* top boundary */
+        y = xlength[1] + 1;
+        for (z = 0; z <= xlength[2] + 1; z++)
+            for (x = 0; x <= xlength[0] + 1; x++)
+                if (flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] == PARALLEL_BOUNDARY && flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + (y - 1) * (xlength[0] + 2) + x] == NO_SLIP)
                     flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+
+        /* bottom boundary */
+        y = 0;
+        for (z = 0; z <= xlength[2] + 1; z++)
+            for (x = 0; x <= xlength[0] + 1; x++)
+                if(flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] == PARALLEL_BOUNDARY && flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + (y + 1) * (xlength[0] + 2) + x] == NO_SLIP)
+                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+//          /* back boundary */
+//        z = 0;
+//        for (y = 0; y <= xlength[1] + 1; y++)
+//            for (x = 0; x <= xlength[0] + 1; x++)
+//                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = PARALLEL_BOUNDARY;
+//
+//        /* left boundary */
+//        x = 0;
+//        for (z = 0; z <= xlength[2] + 1; z++)
+//            for (y = 0; y <= xlength[1] + 1; y++)
+//                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = PARALLEL_BOUNDARY;
+//
+//        /* right boundary */
+//        x = xlength[0] + 1;
+//        for (z = 0; z <= xlength[2] + 1; z++)
+//            for (y = 0; y <= xlength[1] + 1; y++)
+//                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = PARALLEL_BOUNDARY;
+//
+//        /* front boundary, i.e. z = xlength + 1 */
+//        z = xlength[2] + 1;
+//        for (y = 0; y <= xlength[1] + 1; y++)
+//            for (x = 0; x <= xlength[0] + 1; x++)
+//                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = PARALLEL_BOUNDARY;
 
     }
     if (!strcmp(problem, "planeShearFlow"))
@@ -295,42 +395,47 @@ void initialiseFields(double *collideField, double *streamField, int *flagField,
 
         /* front boundary, i.e. z = xlength + 1 */
         z = xlength[2] + 1;
-        for (y = 0; y <= xlength[1] + 1; y++)
-            for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = FREE_SLIP;
+        if (k == kProc - 1)
+            for (y = 0; y <= xlength[1] + 1; y++)
+                for (x = 0; x <= xlength[0] + 1; x++)
+                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = FREE_SLIP;
 
         /* back boundary */
         z = 0;
-        for (y = 0; y <= xlength[1] + 1; y++)
-            for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = FREE_SLIP;
-
-
+        if (k == 0)
+            for (y = 0; y <= xlength[1] + 1; y++)
+                for (x = 0; x <= xlength[0] + 1; x++)
+                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = FREE_SLIP;
 
         /* left boundary */
         x = 0;
-        for (z = 0; z <= xlength[2] + 1; z++)
-            for (y = 0; y <= xlength[1] + 1; y++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = PRESSURE_IN;
+        if (i == 0)
+            for (z = 0; z <= xlength[2] + 1; z++)
+                for (y = 0; y <= xlength[1] + 1; y++)
+                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = PRESSURE_IN;
 
         /* right boundary */
         x = xlength[0] + 1;
-        for (z = 0; z <= xlength[2] + 1; z++)
-            for (y = 0; y <= xlength[1] + 1; y++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = OUTFLOW;
+        if (i == iProc - 1)
+            for (z = 0; z <= xlength[2] + 1; z++)
+                for (y = 0; y <= xlength[1] + 1; y++)
+                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = OUTFLOW;
 
 
         /* top boundary */
         y = xlength[1] + 1;
-        for (z = 0; z <= xlength[2] + 1; z++)
-            for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+        if (j == jProc - 1)
+            for (z = 0; z <= xlength[2] + 1; z++)
+                for (x = 0; x <= xlength[0] + 1; x++)
+                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
 
         /* bottom boundary */
         y = 0;
-        for (z = 0; z <= xlength[2] + 1; z++)
-            for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+        if (j == 0)
+            for (z = 0; z <= xlength[2] + 1; z++)
+                for (x = 0; x <= xlength[0] + 1; x++)
+                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
     }
 }
+
 
