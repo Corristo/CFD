@@ -48,7 +48,46 @@ int main(int argc, char *argv[])
             treatBoundary(collideField, flagField, bddParams, xlength);
 
             if (t % timestepsPerPlotting == 0)
+            {
                 writeVtkOutput(collideField, flagField, "./Paraview/output", (unsigned int) t / timestepsPerPlotting, xlength);
+                 /** debugging code */
+//                FILE *fp = NULL;
+//                char szFileName[80];
+//                sprintf( szFileName, "Testdata/%s/%i.dat", problem, t / timestepsPerPlotting );
+//                fp = fopen(szFileName,"w");
+//                for (int i = 0; i < PARAMQ * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2); i++)
+//                    fprintf(fp, "%0.7f\n", collideField[i]);
+
+                double exactCollideField[PARAMQ * (xlength[0] + 2) *  (xlength[1] + 2) * (xlength[2] + 2)];
+                FILE *fp = NULL;
+                unsigned int line = 0;
+                int noOfReadEntries;
+                int error = 0;
+                char szFileName[80];
+                sprintf( szFileName, "Testdata/%s/%i.dat", problem, t / timestepsPerPlotting );
+                fp = fopen(szFileName,"r");
+                if (fp != NULL)
+                {
+                    for (line = 0; line < PARAMQ * (xlength[0] + 2) *  (xlength[1] + 2) * (xlength[2] + 2); line++)
+                    {
+                        noOfReadEntries = fscanf(fp,"%lf",&exactCollideField[line]);
+                        if (noOfReadEntries != 1)
+                            continue;
+                    }
+                }
+                fclose(fp);
+                for (int z = 1; z <= xlength[2]; z++)
+                    for (int y = 1; y <= xlength[1]; y++)
+                        for(int x = 1; x <= xlength[0]; x++)
+                            for (int i = 0; i < PARAMQ; i++)
+                                if (fabs(collideField[PARAMQ * (z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2 + x) + i)] - exactCollideField[PARAMQ * (z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2 + x) + i)]) > 1e-4)
+                                    error = 1;
+                if (error)
+                    printf("ERROR: Process %d has a different collideField in timestep %d\n", 0, t);
+
+                /** end of debugging code */
+            }
+
             int pct = ((float) t / timesteps) * 100;
 
             printf("\b\b\b%02d%%", pct);
