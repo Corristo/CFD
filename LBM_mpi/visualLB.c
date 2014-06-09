@@ -27,19 +27,10 @@ void write_vtkHeader( FILE *fp, int *xlength )
 void write_vtkPointCoordinates( FILE *fp, int *xlength, int iCoord, int jCoord, int kCoord)
 {
     double originX, originY, originZ;
-//    if ( iCoord != 0)
-        originX = (double) iCoord * xlength[0] - 1;
-//    else
-//        originX = 0.0;
-//    if (jCoord != 0)
-        originY = (double) jCoord * xlength[1] - 1;
-//    else
-//        originY = 0.0;
-//    if (kCoord != 0)
-        originZ = (double) kCoord * xlength[2] - 1;
-//    else
-//        originZ = 0.0;
 
+    originX = (double) iCoord * xlength[0] - 1;
+    originY = (double) jCoord * xlength[1] - 1;
+    originZ = (double) kCoord * xlength[2] - 1;
 
     int x = 0;
     int y = 0;
@@ -100,6 +91,16 @@ void writeVtkOutput(const double * const collideField, const int * const flagFie
                 currentCellIndex = PARAMQ * (z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x);
                 computeDensityAVX(collideField + currentCellIndex, &cellDensity);
                 fprintf(fp, "%f\n", cellDensity);
+            }
+
+    fprintf(fp, "SCALARS boundaryType integer 1 \n");
+    fprintf(fp, "LOOKUP_TABLE default \n");
+    for(z = 1; z <= xlength[2]; z++)
+        for(y = 1; y <= xlength[1]; y++)
+            for (x = 1; x <= xlength[0]; x++)
+            {
+                currentCellIndex = (z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x);
+                fprintf(fp, "%d\n", flagField[currentCellIndex]);
             }
 
 
