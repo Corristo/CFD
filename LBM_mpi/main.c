@@ -38,7 +38,7 @@ int main(int argc, char *argv[])
     double *sendBuffer[6];
     double *readBuffer[6];
 
-    double * exactCollideField; // for debugging only
+//    double * exactCollideField; // for debugging only
 
 
 
@@ -100,42 +100,42 @@ int main(int argc, char *argv[])
 
             /** debugging code: check collideField */
             /* check correctness of collideField with reference data */
-            if (t % timestepsPerPlotting == 0)
-            {
-
-                exactCollideField = (double*) malloc((size_t) sizeof(double) * PARAMQ * (xlength[0] + 2)*(xlength[1] + 2)*(xlength[2] + 2));
-
-                int x, y, z, i;
-                FILE *fp = NULL;
-                unsigned int line = 0;
-                int error = 0;
-                char szFileName[1200];
-                sprintf( szFileName, "Testdata/%s/%i.dat", problem, t / timestepsPerPlotting );
-                fp = fopen(szFileName,"r");
-                if (fp != NULL)
-                {
-                    for (line = 0; line < PARAMQ * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2); line++)
-                        fscanf(fp,"%lf",&exactCollideField[line]);
-
-                    for (z = 1; z <= local_xlength[2]; z++)
-                        for (y = 1; y <= local_xlength[1]; y++)
-                            for(x = 1; x <= local_xlength[0]; x++)
-                                for (i = 0; i < PARAMQ; i++)
-                                    if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FLUID)
-                                       if (fabs(collideField[PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + i] - exactCollideField[PARAMQ * ((z + kCoord * (xlength[2] / kProc)) * (xlength[0] + 2) * (xlength[1] + 2) + (y + jCoord * (xlength[1]/jProc)) * (xlength[0] + 2) + (x + iCoord * (xlength[0] / iProc) )) + i]) > 1e-5)
-                                            error = 1;
-                    if (error)
-                        printf("ERROR: Process %d has a different collideField in timestep %d\n",rank, t);
-
-                    fclose(fp);
-
-                }
-                else
-                    printf("ERROR: Process %d cannot read file %s\n", rank, szFileName);
-
-                free(exactCollideField);
-
-            }
+//            if (t % timestepsPerPlotting == 0)
+//            {
+//
+//                exactCollideField = (double*) malloc((size_t) sizeof(double) * PARAMQ * (xlength[0] + 2)*(xlength[1] + 2)*(xlength[2] + 2));
+//
+//                int x, y, z, i;
+//                FILE *fp = NULL;
+//                unsigned int line = 0;
+//                int error = 0;
+//                char szFileName[1200];
+//                sprintf( szFileName, "Testdata/%s/%i.dat", problem, t / timestepsPerPlotting );
+//                fp = fopen(szFileName,"r");
+//                if (fp != NULL)
+//                {
+//                    for (line = 0; line < PARAMQ * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2); line++)
+//                        fscanf(fp,"%lf",&exactCollideField[line]);
+//
+//                    for (z = 1; z <= local_xlength[2]; z++)
+//                        for (y = 1; y <= local_xlength[1]; y++)
+//                            for(x = 1; x <= local_xlength[0]; x++)
+//                                for (i = 0; i < PARAMQ; i++)
+//                                    if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FLUID)
+//                                       if (fabs(collideField[PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + i] - exactCollideField[PARAMQ * ((z + kCoord * (xlength[2] / kProc)) * (xlength[0] + 2) * (xlength[1] + 2) + (y + jCoord * (xlength[1]/jProc)) * (xlength[0] + 2) + (x + iCoord * (xlength[0] / iProc) )) + i]) > 1e-5)
+//                                            error = 1;
+//                    if (error)
+//                        printf("ERROR: Process %d has a different collideField in timestep %d\n",rank, t);
+//
+//                    fclose(fp);
+//
+//                }
+//                else
+//                    printf("ERROR: Process %d cannot read file %s\n", rank, szFileName);
+//
+//                free(exactCollideField);
+//
+//            }
             /** end of debugging code */
 
 
