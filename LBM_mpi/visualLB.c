@@ -4,7 +4,7 @@
 #include "computeCellValues.h"
 #include "LBDefinitions.h"
 
-void write_vtkHeader( FILE *fp, int *xlength )
+void write_vtkHeader( FILE *fp, int * local_xlength )
 {
     if( fp == NULL )
     {
@@ -19,33 +19,33 @@ void write_vtkHeader( FILE *fp, int *xlength )
     fprintf(fp,"ASCII\n");
     fprintf(fp,"\n");
     fprintf(fp,"DATASET STRUCTURED_GRID\n");
-    fprintf(fp,"DIMENSIONS  %i %i %i \n", xlength[0], xlength[1], xlength[2]);
-    fprintf(fp,"POINTS %i float\n", (xlength[0]) * (xlength[1]) * (xlength[2]));
+    fprintf(fp,"DIMENSIONS  %i %i %i \n", local_xlength[0], local_xlength[1], local_xlength[2]);
+    fprintf(fp,"POINTS %i float\n", (local_xlength[0]) * (local_xlength[1]) * (local_xlength[2]));
     fprintf(fp,"\n");
 }
 
-void write_vtkPointCoordinates( FILE *fp, int *xlength, int iCoord, int jCoord, int kCoord)
+void write_vtkPointCoordinates( FILE *fp, int *xlength, int * local_xlength, int iCoord, int jCoord, int kCoord, int iProc, int jProc, int kProc)
 {
     double originX, originY, originZ;
 
-    originX = (double) iCoord * xlength[0] - 1;
-    originY = (double) jCoord * xlength[1] - 1;
-    originZ = (double) kCoord * xlength[2] - 1;
+    originX = (double) iCoord * (xlength[0] / iProc);
+    originY = (double) jCoord * (xlength[1] / jProc);
+    originZ = (double) kCoord * (xlength[2] / kProc);
 
     int x = 0;
     int y = 0;
     int z = 0;
 
-    for(z = 1; z <= xlength[2]; z++)
-        for(y = 1; y <= xlength[1]; y++)
-            for ( x = 1; x <= xlength[0]; x++)
+    for(z = 1; z <= local_xlength[2]; z++)
+        for(y = 1; y <= local_xlength[1]; y++)
+            for ( x = 1; x <= local_xlength[0]; x++)
                 fprintf(fp, "%f %f %f\n", originX+(double) x , originY + (double) y,  originZ + (double) z);
 
 
 }
 
 
-void writeVtkOutput(const double * const collideField, const int * const flagField, const char * filename, unsigned int t, int *xlength, int rank, int iCoord, int jCoord, int kCoord)
+void writeVtkOutput(const double * const collideField, const int * const flagField, const char * filename, unsigned int t, int *xlength, int * local_xlength, int rank, int iCoord, int jCoord, int kCoord, int iProc, int jProc, int kProc)
 {
     int x, y, z, currentCellIndex;
     double cellVelocity[3], cellDensity;
@@ -62,18 +62,18 @@ void writeVtkOutput(const double * const collideField, const int * const flagFie
         return;
     }
 
-    write_vtkHeader( fp, xlength);
-    write_vtkPointCoordinates(fp, xlength, iCoord, jCoord, kCoord);
+    write_vtkHeader( fp, local_xlength);
+    write_vtkPointCoordinates(fp, xlength, local_xlength, iCoord, jCoord, kCoord, iProc, jProc, kProc);
 
-    fprintf(fp,"POINT_DATA %i \n", (xlength[0]) * (xlength[1]) * (xlength[2]));
+    fprintf(fp,"POINT_DATA %i \n", (local_xlength[0]) * (local_xlength[1]) * (local_xlength[2]));
 
     fprintf(fp,"\n");
     fprintf(fp, "VECTORS velocity float\n");
-    for(z = 1; z <= xlength[2]; z++)
-        for (y = 1; y <= xlength[1]; y++)
-            for (x = 1; x <= xlength[0]; x++)
+    for(z = 1; z <= local_xlength[2]; z++)
+        for (y = 1; y <= local_xlength[1]; y++)
+            for (x = 1; x <= local_xlength[0]; x++)
             {
-                currentCellIndex = PARAMQ * (z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x);
+                currentCellIndex = PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x);
                 computeDensityAVX(collideField + currentCellIndex, &cellDensity);
                 computeVelocityAVX(collideField + currentCellIndex, &cellDensity, cellVelocity);
                 fprintf(fp, "%f %f %f\n", cellVelocity[0], cellVelocity[1], cellVelocity[2]);
@@ -84,22 +84,22 @@ void writeVtkOutput(const double * const collideField, const int * const flagFie
 
     fprintf(fp, "SCALARS density float 1 \n");
     fprintf(fp, "LOOKUP_TABLE default \n");
-    for(z = 1; z <= xlength[2]; z++)
-        for(y = 1; y <= xlength[1]; y++)
-            for (x = 1; x <= xlength[0]; x++)
+    for(z = 1; z <= local_xlength[2]; z++)
+        for(y = 1; y <= local_xlength[1]; y++)
+            for (x = 1; x <= local_xlength[0]; x++)
             {
-                currentCellIndex = PARAMQ * (z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x);
+                currentCellIndex = PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x);
                 computeDensityAVX(collideField + currentCellIndex, &cellDensity);
                 fprintf(fp, "%f\n", cellDensity);
             }
 
     fprintf(fp, "SCALARS boundaryType integer 1 \n");
     fprintf(fp, "LOOKUP_TABLE default \n");
-    for(z = 1; z <= xlength[2]; z++)
-        for(y = 1; y <= xlength[1]; y++)
-            for (x = 1; x <= xlength[0]; x++)
+    for(z = 1; z <= local_xlength[2]; z++)
+        for(y = 1; y <= local_xlength[1]; y++)
+            for (x = 1; x <= local_xlength[0]; x++)
             {
-                currentCellIndex = (z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x);
+                currentCellIndex = (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x);
                 fprintf(fp, "%d\n", flagField[currentCellIndex]);
             }
 
