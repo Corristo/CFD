@@ -9,6 +9,7 @@
 #include "LBDefinitions.h"
 #include <time.h>
 #include <unistd.h>
+#include <papi.h>
 
 int main(int argc, char *argv[])
 {
@@ -23,7 +24,16 @@ int main(int argc, char *argv[])
     int xlength[3], timesteps, timestepsPerPlotting;
     double tau, bddParams[7];
 
-    double * exactCollideField;
+    long long counters[3];
+	int PAPI_events[] = {
+		PAPI_TOT_CYC,
+		PAPI_L2_DCM,
+		PAPI_L2_DCA };
+    int papi_integer;
+
+	PAPI_library_init(PAPI_VER_CURRENT);
+
+//    double * exactCollideField;
 
 
     if(readParameters(xlength, &tau, bddParams, &timesteps, &timestepsPerPlotting, problem, pgmInput, argc, argv) == 0)
@@ -45,6 +55,8 @@ int main(int argc, char *argv[])
         /** debugging code end */
 
         printf("Progress:     ");
+
+        papi_integer = PAPI_start_counters( PAPI_events, 3 );
         for(int t = 0; t < timesteps; t++)
         {
             double *swap = NULL;
@@ -102,7 +114,7 @@ int main(int argc, char *argv[])
 //                free(exactCollideField);
                 /** end of debugging code */
             }
-
+            PAPI_read_counters( counters, 3 );
             int pct = ((float) t / timesteps) * 100;
 
             printf("\b\b\b%02d%%", pct);
@@ -117,6 +129,11 @@ int main(int argc, char *argv[])
         printf("Running time: %.2f\n", time_spent);
         printf("MLUPS: %.3f\n", ((double) (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2) * timesteps) / (1000000.0 * time_spent));
 
+
+        printf("%lld L2 cache misses (%.3lf%% misses) in %lld cycles\n",
+		counters[1],
+		(double)counters[1] / (double)counters[2],
+		counters[0] );
         free(collideField);
         free(streamField);
         free(flagField);

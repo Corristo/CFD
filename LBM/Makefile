@@ -11,7 +11,7 @@ CFLAGS=-pedantic -Wall -std=gnu99  -Ofast -msse3 -mavx -funroll-loops -g -pg
 
 # Linker flags
 # ------------
-LDFLAGS=-pg
+LDFLAGS=-pg -lpapi
 
 OBJECTS=$(SOURCES:.c=.o)
 EXECUTABLE=lbsim
