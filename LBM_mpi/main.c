@@ -1,6 +1,7 @@
 #ifndef _MAIN_C_
 #define _MAIN_C_
 
+#include <mpi.h>
 #include "collision.h"
 #include "streaming.h"
 #include "initLB.h"
@@ -10,7 +11,6 @@
 #include "communication.h"
 #include <time.h>
 #include <unistd.h>
-#include <mpi.h>
 #include "parallel.h"
 
 
@@ -33,10 +33,9 @@ int main(int argc, char *argv[])
 
     int neighbours[6];  // [0: left, 1: right, 2: top, 3: bottom, 4: front, 5: back]
 
-    // send and read buffers for all possible directions :
+    // send and read MPI datatypes for all possible directions :
     // [0: left, 1: right, 2: top, 3: bottom, 4: front, 5: back]
-    double *sendBuffer[6];
-    double *readBuffer[6];
+    MPI_Datatype MPISendTypes[6], MPIRecvTypes[6];
 
 //    double * exactCollideField; // for debugging only
 
@@ -68,18 +67,19 @@ int main(int argc, char *argv[])
         streamField = (double*) malloc((size_t) sizeof(double) * PARAMQ * (local_xlength[0] + 2)*(local_xlength[1] + 2)*(local_xlength[2] + 2));
         flagField = (int *) malloc((size_t) sizeof (int) * (local_xlength[0] + 2)*(local_xlength[1] + 2)*(local_xlength[2] + 2));
 
-        computeNeighbours( iProc, jProc, kProc, neighbours );
-        initialiseBuffers( local_xlength, sendBuffer, readBuffer, neighbours );
         initialiseFields( collideField, streamField, flagField, xlength, local_xlength, problem, pgmInput, rank, iProc, jProc, kProc );
+        computeNeighbours( iProc, jProc, kProc, neighbours );
+        initialiseMPITypes(local_xlength, neighbours, flagField, MPISendTypes, MPIRecvTypes);
+
 
         if (!rank)
             printf("Progress:     ");
         for(int t = 0; t < timesteps; t++)
         {
             double *swap = NULL;
-            communicateBoundaryValues(local_xlength, sendBuffer, readBuffer, flagField, collideField, neighbours, 0); // communicate along x - axis (right to left - left to right)
-            communicateBoundaryValues(local_xlength, sendBuffer, readBuffer, flagField, collideField, neighbours, 2); // communicate along z - axis (back to front - front to back)
-            communicateBoundaryValues(local_xlength, sendBuffer, readBuffer, flagField, collideField, neighbours, 1); // communicate along y - axis (bottom to top - top to bottom)
+            communicateBoundaryValues(local_xlength, MPISendTypes, MPIRecvTypes, collideField, neighbours, 0); // communicate along x - axis (right to left - left to right)
+            communicateBoundaryValues(local_xlength, MPISendTypes, MPIRecvTypes, collideField, neighbours, 2); // communicate along z - axis (back to front - front to back)
+            communicateBoundaryValues(local_xlength, MPISendTypes, MPIRecvTypes, collideField, neighbours, 1); // communicate along y - axis (bottom to top - top to bottom)
             doStreaming(collideField, streamField, flagField, local_xlength);
             swap = collideField;
             collideField = streamField;
@@ -149,24 +149,12 @@ int main(int argc, char *argv[])
 
             printf("Running time (CPU time): %.2fs\n", time_spent);
             printf("Running time (Wall clock): %2.fs\n", (double)(time(NULL) - start) );
-            printf("MLUPS: %.3f\n", ((double) (xlength[0]) * (xlength[1]) * (xlength[2]) * timesteps) / (1000000.0 * time_spent));
+            printf("MLUPS: %.3f\n", ((double) (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2) * timesteps) / (1000000.0 * time_spent));
         }
 
         free(collideField);
         free(streamField);
         free(flagField);
-        free(sendBuffer[0]);
-        free(sendBuffer[1]);
-        free(sendBuffer[2]);
-        free(sendBuffer[3]);
-        free(sendBuffer[4]);
-        free(sendBuffer[5]);
-        free(readBuffer[0]);
-        free(readBuffer[1]);
-        free(readBuffer[2]);
-        free(readBuffer[3]);
-        free(readBuffer[4]);
-        free(readBuffer[5]);
     }
 
     MPI_Finalize();
