@@ -87,7 +87,7 @@ void initialiseFields(double *collideField, double *streamField, int *flagField,
             collideField[j + i * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2)] = streamField[j+ i * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2)] = LATTICEWEIGHTS[i];
 
     for (i = 0; i < (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2); i++)
-                flagField[i] = FLUID;
+        flagField[i] = FLUID;
 
     if (!strcmp(problem, "drivenCavity"))
     {
@@ -127,7 +127,6 @@ void initialiseFields(double *collideField, double *streamField, int *flagField,
             for (x = 0; x <= xlength[0] + 1; x++)
                 flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = MOVING_WALL;
     }
-
     if (!strcmp(problem, "tiltedPlate"))
     {
         int** pgmImage;
@@ -275,5 +274,81 @@ void initialiseFields(double *collideField, double *streamField, int *flagField,
             for (x = 0; x <= xlength[0] + 1; x++)
                 flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
     }
+    /** debugging code: checking the flagField */
+//    int * exactFlagField;
+//    exactFlagField = (int *) malloc( (size_t) sizeof( int ) * (xlength[0] + 2) *  (xlength[1] + 2) * (xlength[2] + 2));
+//    FILE *fp2 = NULL;
+//    unsigned int line2 = 0;
+//    int error2 = 0;
+//    char szFileName2[80];
+//
+//    sprintf( szFileName2, "Testdata/%s/flagField.dat", problem );
+//    fp2 = fopen(szFileName2,"r");
+//    if (fp2 != NULL)
+//    {
+//        for (line2 = 0; line2 < (xlength[0] + 2) *  (xlength[1] + 2) * (xlength[2] + 2); line2++)
+//            fscanf(fp2,"%d",&exactFlagField[line2]);
+//    }
+//    fclose(fp2);
+//    for (z = 1; z <= xlength[2]; z++)
+//        for (y = 1; y <= xlength[1]; y++)
+//            for(x = 1; x <= xlength[0]; x++)
+//                for (i = 0; i < PARAMQ; i++)
+//                    if (flagField[(z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x)] != exactFlagField[(z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x)])
+//                        error2 = 1;
+//    if (error2)
+//        printf("ERROR: Different flagField at inner nodes.\n");
+//
+//    error2 = 0;
+//    // Check global boundaries as well
+//// Left boundary
+//    x = 0;
+//    for (z = 0; z <= xlength[2] + 1; z++)
+//        for (y = 0; y <= xlength[1] + 1; y++)
+//            if (flagField[(z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x)] != exactFlagField[(z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x)])
+//                error2 = 1;
+//
+//
+//    // Right boundary
+//    x = xlength[0] + 1;
+//    for (z = 0; z <= xlength[2] + 1; z++)
+//        for (y = 0; y <= xlength[1] + 1; y++)
+//            if (flagField[(z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x)] != exactFlagField[(z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x)])
+//                error2 = 1;
+//
+//    // Bottom boundary
+//    y = 0;
+//    for (z = 0; z <= xlength[2] + 1; z++)
+//        for (x = 0; x <= xlength[0] + 1; x++)
+//            if (flagField[(z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x)] != exactFlagField[(z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x)])
+//                error2 = 1;
+//
+//    // Top boundary
+//    y = xlength[1] + 1;
+//    for (z = 0; z <= xlength[2] + 1; z++)
+//        for (x = 0; x <= xlength[0] + 1; x++)
+//            if (flagField[(z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x)] != exactFlagField[(z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x)])
+//                error2 = 1;
+//
+//    // back boundary
+//    z = 0;
+//    for (y = 0; y <= xlength[1] + 1; y++)
+//        for (x = 0; x <= xlength[0] + 1; x++)
+//            if (flagField[(z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x)] != exactFlagField[(z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x)])
+//                error2 = 1;
+//
+//    // front boundary
+//    z = xlength[2] + 1;
+//    for (y = 0; y <= xlength[1] + 1; y++)
+//        for (x = 0; x <= xlength[0] + 1; x++)
+//            if (flagField[(z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x)] != exactFlagField[(z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x)])
+//                error2 = 1;
+//
+//
+//    if (error2)
+//        printf("ERROR: Different flagField at global boundary.\n");
+//
+//    free(exactFlagField);
+
 }
 

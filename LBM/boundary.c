@@ -125,8 +125,8 @@ void treatBoundary(double *collideField, int* flagField, const double * const bd
                         if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
                             if (!flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ])
                             {
-                                currentCellIndex = (coordinate[2] * (xlength[0] + 2 ) * (xlength[1] + 2) + coordinate[1] * (xlength[0] + 2) + coordinate[0]) + i * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
-                                neighbourCellIndex = (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i) * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
+                                currentCellIndex = z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x + i * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
+                                neighbourCellIndex = neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX + (PARAMQ - 1 - i) * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
                                 collideField[currentCellIndex] = collideField[neighbourCellIndex];
                             }
                     }
