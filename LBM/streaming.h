@@ -5,6 +5,8 @@
  *  collideField to streamField.
  */
 void doStreaming(double *collideField, double *streamField,int *flagField,int *xlength);
+void doStreamingSSE(double *collideField, double *streamField,int *flagField,int *xlength);
+void doStreamingAVX(double *collideField, double *streamField,int *flagField,int *xlength);
 
 #endif
 
