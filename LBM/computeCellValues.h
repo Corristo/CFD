@@ -5,11 +5,11 @@
  *  currentCell thus denotes the address of the first particle distribution function of the
  *  respective cell. The result is stored in density.
  */
-void computeDensity(const double *const currentCell, double *density);
+void computeDensity(const double *const currentCell, double *density, int tot_cells);
 void computeDensitySSE(const double *const currentCell, double *density);
 void computeDensityAVX(const double *const currentCell, double *density);
 /** computes the velocity within currentCell and stores the result in velocity */
-void computeVelocity(const double *const currentCell, const double * const density,double *velocity);
+void computeVelocity(const double *const currentCell, const double * const density,double *velocity, int tot_cells);
 void computeVelocitySSE(const double *const currentCell, const double * const density,double *velocity);
 void computeVelocityAVX(const double * const currentCell, const double * const density, double *velocity);
 /** computes the equilibrium distributions for all particle distribution functions of one

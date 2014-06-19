@@ -8,12 +8,12 @@
 #include <immintrin.h>
 
 
- void computeDensity(const double *const currentCell, double *density)
+void computeDensity(const double *const currentCell, double *density, int tot_cell)
 {
     *density = 0.0;
     int i;
     for (i = 0; i < PARAMQ; i++)
-        *density += currentCell[i];
+      *density += *(currentCell + i * tot_cell);
 }
 
 void computeDensityAVX(const double * const currentCell, double *density)
@@ -33,41 +33,37 @@ void computeDensityAVX(const double * const currentCell, double *density)
 
 
 }
+
 void computeDensitySSE(const double * const currentCell, double *density)
 {
     __m128d vsum = _mm_set1_pd(0.0);
     int i;
     for (i = 0; i < PARAMQ - 1; i += 2)
     {
-        __m128d v = _mm_loadu_pd(&currentCell[i]);
+      __m128d v = _mm_loadu_pd(&currentCell[i]);
+      
         vsum = _mm_add_pd(vsum, v);
     }
     vsum = _mm_hadd_pd(vsum, vsum);
     _mm_storeh_pd(density, vsum);
     if (i < PARAMQ)
     {
-        *density += currentCell[i];
+      *density += currentCell[i];
     }
 }
 
-void computeVelocity(const double * const currentCell, const double * const density, double *velocity)
+void computeVelocity(const double * const currentCell, const double * const density, double *velocity, int tot_cells)
 {
     velocity[0] = 0.0;
     velocity[1] = 0.0;
     velocity[2] = 0.0;
     for (int i = 0; i < PARAMQ; i++)
     {
-        velocity[0] += currentCell[i] * LATTICEVELOCITIES[i][0];
-    }
-
-    for (int i = 0; i < PARAMQ; i++)
-    {
-        velocity[1] += currentCell[i] * LATTICEVELOCITIES[i][1];
-    }
-
-    for (int i = 0; i < PARAMQ; i++)
-    {
-        velocity[2] += currentCell[i] * LATTICEVELOCITIES[i][2];
+        velocity[0] += *(currentCell + i * tot_cells) * LATTICEVELOCITIES[i][0];
+   
+        velocity[1] += *(currentCell + i * tot_cells) * LATTICEVELOCITIES[i][1];
+   
+        velocity[2] += *(currentCell + i * tot_cells) * LATTICEVELOCITIES[i][2];
     }
 
     velocity[0] = velocity[0] / (*density);
@@ -81,12 +77,14 @@ void computeVelocityAVX(const double * const currentCell, const double * const d
     int i;
     double const zero = 0.0;
     v0 = v1 = v2 = _mm256_broadcast_sd(&zero);
+    
     for (i = 0; i < PARAMQ - 3; i += 4)
     {
         __m256d vc, vl0, vl1, vl2;
         __m128i vtemp;
+      
         vc = _mm256_loadu_pd(&currentCell[i]);
-        vc = _mm256_loadu_pd(&currentCell[i]);
+	
         vtemp = _mm_loadu_si128((__m128i *)&LATTICEVELOCITIES2[0][i]);
         vl0 = _mm256_cvtepi32_pd(vtemp);
         vtemp = _mm_loadu_si128((__m128i *)&LATTICEVELOCITIES2[1][i]);
@@ -105,9 +103,9 @@ void computeVelocityAVX(const double * const currentCell, const double * const d
     velocity[2] = ((double*)&v2)[0] + ((double*)&v2)[2];
     for (; i < PARAMQ; i++)
     {
-        velocity[0] += currentCell[i] * LATTICEVELOCITIES2[0][i];
-        velocity[1] += currentCell[i] * LATTICEVELOCITIES2[1][i];
-        velocity[2] += currentCell[i] * LATTICEVELOCITIES2[2][i];
+      velocity[0] += currentCell[i] * LATTICEVELOCITIES2[0][i];
+      velocity[1] += currentCell[i] * LATTICEVELOCITIES2[1][i];
+      velocity[2] += currentCell[i] * LATTICEVELOCITIES2[2][i];
     }
     velocity[0] = velocity[0] / (*density);
     velocity[1] = velocity[1] / (*density);
