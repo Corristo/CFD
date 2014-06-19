@@ -8,7 +8,15 @@
 #define INFLOW 4
 #define OUTFLOW 5
 #define PRESSURE_IN 6
+#define PARALLEL_BOUNDARY 7
 #include <stdint.h>
+
+static const int VELOCITIESRIGHTOUT[5] = { 3, 7, 13, 17, 10 };
+static const int VELOCITIESLEFTOUT[5] = { 1, 5, 11, 15, 8 };
+static const int VELOCITIESBOTTOMOUT[5] = { 0, 5, 7, 14, 6 };
+static const int VELOCITIESTOPOUT[5] = { 4, 11, 13, 18, 12 };
+static const int VELOCITIESFRONTOUT[5] = { 14, 15, 17, 18, 16 };
+static const int VELOCITIESBACKOUT[5] = { 0, 1, 3, 4, 2 };
 
 static const int32_t LATTICEVELOCITIES[PARAMQ][3] = {{0, -1, -1},
                                           {-1, 0, -1},
