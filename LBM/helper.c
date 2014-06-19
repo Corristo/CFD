@@ -560,35 +560,35 @@ int **read_pgm(const char *filename)
     return pic;
 }
 
-int ***read_vtk(const char *filename)
-{
-    FILE *input = NULL;
-    char line[1024], trashstring[1024];
-    int levels;
-    int xsize, ysize, zsize;
-    int i1, j1, k1;
-    int **pic = NULL;
-
-
-    if ((input=fopen(filename,"rb"))==0)
-    {
-       char szBuff[80];
-           sprintf( szBuff, "Can not read file %s !!!", filename );
-           ERROR( szBuff );
-    }
-
-    /* skip the comments */
-    do
-    if(fgets(line,sizeof line,input));
-    while(*line=='#');
-
-    /* read the width and height */
-    fgets(line,sizeof line,input);
-    fgets(line,sizeof line,input);
-    fgets(line,sizeof line,input);
-    sscanf(line,"%s %d %d %d\n", trashstring, &xsize,&ysize, &zsize);
-
-    printf("Image size: %d x %d\n x %d", xsize,ysize, zsize);
+//int ***read_vtk(const char *filename)
+//{
+//    FILE *input = NULL;
+//    char line[1024], trashstring[1024];
+//    int levels;
+//    int xsize, ysize, zsize;
+//    int i1, j1, k1;
+//    int **pic = NULL;
+//
+//
+//    if ((input=fopen(filename,"rb"))==0)
+//    {
+//       char szBuff[80];
+//           sprintf( szBuff, "Can not read file %s !!!", filename );
+//           ERROR( szBuff );
+//    }
+//
+//    /* skip the comments */
+//    do
+//    if(fgets(line,sizeof line,input));
+//    while(*line=='#');
+//
+//    /* read the width and height */
+//    fgets(line,sizeof line,input);
+//    fgets(line,sizeof line,input);
+//    fgets(line,sizeof line,input);
+//    sscanf(line,"%s %d %d %d\n", trashstring, &xsize,&ysize, &zsize);
+//
+//    printf("Image size: %d x %d\n x %d", xsize,ysize, zsize);
 
 //    /* read # of gray levels */
 //    if(fgets(line,sizeof line,input));
@@ -618,5 +618,5 @@ int ***read_vtk(const char *filename)
 //            }
 //         }
 //    }
-
-}
+//
+//}

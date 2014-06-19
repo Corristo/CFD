@@ -71,9 +71,9 @@ void writeVtkOutput(const double * const collideField, const int * const flagFie
         for (y = 1; y <= xlength[1]; y++)
             for (x = 1; x <= xlength[0]; x++)
             {
-                currentCellIndex = PARAMQ * (z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x);
-                computeDensitySSE(collideField + currentCellIndex, &cellDensity);
-                computeVelocityAVX(collideField + currentCellIndex, &cellDensity, cellVelocity);
+                currentCellIndex = (z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x);
+                computeDensity(collideField + currentCellIndex, &cellDensity, (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2));
+                computeVelocity(collideField + currentCellIndex, &cellDensity, cellVelocity, (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2));
                 fprintf(fp, "%f %f %f\n", cellVelocity[0], cellVelocity[1], cellVelocity[2]);
             }
 
@@ -86,8 +86,8 @@ void writeVtkOutput(const double * const collideField, const int * const flagFie
         for(y = 1; y <= xlength[1]; y++)
             for (x = 1; x <= xlength[0]; x++)
             {
-                currentCellIndex = PARAMQ * (z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x);
-                computeDensitySSE(collideField + currentCellIndex, &cellDensity);
+                currentCellIndex = (z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x);
+                computeDensity(collideField + currentCellIndex, &cellDensity, (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2));
                 fprintf(fp, "%f\n", cellDensity);
             }
  fprintf(fp, "SCALARS boundaryType integer 1 \n");

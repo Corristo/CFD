@@ -5,7 +5,7 @@ SOURCES=initLB.c visualLB.c boundary.c collision.c streaming.c computeCellValues
 # --------
 CC=gcc
 
-CFLAGS=-pedantic -Wall -Werror -std=gnu99  -Ofast -msse3 -mavx -funroll-loops -g -pg
+CFLAGS=-pedantic -Wall -std=gnu99  -Ofast -msse3 -mavx -funroll-loops -g -pg
 
 
 
