@@ -81,20 +81,13 @@ int readParameters(int *xlength, double *tau, double *bddParams, int *timesteps,
 
 void initialiseFields(double *collideField, double *streamField, int *flagField, int *xlength, char *problem, char* pgmInput)
 {
-    int i, x, y, z;
+    int i, j, x, y, z;
     for (i = 0; i < PARAMQ; i++)
-        for (z = 0; z <= xlength[2] + 1; z++)
-            for (y = 0; y <= xlength[1] + 1; y++)
-                for (x = 0; x <= xlength[0] + 1; x++)
-                {
-                    collideField[(z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2)] = LATTICEWEIGHTS[i];
-                    streamField[(z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2)] = LATTICEWEIGHTS[i];
-                }
+        for (j = 0; j < (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2); j++)
+            collideField[j + i * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2)] = streamField[j+ i * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2)] = LATTICEWEIGHTS[i];
 
-    for (z = 0; z <= xlength[2] + 1; z++)
-        for (y = 0; y <= xlength[1] + 1; y++)
-            for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = FLUID;
+    for (i = 0; i < (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2); i++)
+                flagField[i] = FLUID;
 
     if (!strcmp(problem, "drivenCavity"))
     {
