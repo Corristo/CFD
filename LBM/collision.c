@@ -23,7 +23,7 @@ void doCollision(double *collideField, int *flagField,const double * const tau,i
             {
                 currentCell = collideField + PARAMQ * (z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x);
                 density = 0.0;
-                computeDensityAVX(currentCell, &density);
+                computeDensitySSE(currentCell, &density);
 
                 if (__builtin_expect(fabs(1.0 - density) > 0.1, 0))
                     fprintf(stderr, "WARNING: Density is %.3f in cell (%d, %d, %d)\n", density, x, y, z);

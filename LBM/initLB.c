@@ -97,11 +97,6 @@ void initialiseFields(double *collideField, double *streamField, int *flagField,
 
     if (!strcmp(problem, "drivenCavity"))
     {
-        /* top boundary */
-        y = xlength[1] + 1;
-        for (z = 0; z <= xlength[2] + 1; z++)
-            for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = MOVING_WALL;
         /* back boundary */
         z = 0;
         for (y = 0; y <= xlength[1] + 1; y++)
@@ -131,31 +126,42 @@ void initialiseFields(double *collideField, double *streamField, int *flagField,
         for (y = 0; y <= xlength[1] + 1; y++)
             for (x = 0; x <= xlength[0] + 1; x++)
                 flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+
+        /* top boundary */
+        y = xlength[1] + 1;
+        for (z = 0; z <= xlength[2] + 1; z++)
+            for (x = 0; x <= xlength[0] + 1; x++)
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = MOVING_WALL;
     }
 
     if (!strcmp(problem, "tiltedPlate"))
     {
         int** pgmImage;
         pgmImage = read_pgm(pgmInput);
-        //write_imatrix( "testing.txt", pgmImage, 0, xlength[0]+1,0,xlength[1]+1,1,1,0);               
 
-     for (z = 1; z <= xlength[2]; z++)
+        for (z = 1; z <= xlength[2]; z++)
             for (y = 1; y <= xlength[1]; y++)
                 for (x = 1; x <= xlength[0]; x++)
-                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = pgmImage[x][y];
-        //free_imatrix(pgmImage, 0, xlength[0] + 2, 0, xlength[1] + 2);
+                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = !!pgmImage[x][y];
+        free_imatrix(pgmImage, 0, xlength[0] + 2, 0, xlength[1] + 2);
 
-         /* front boundary, i.e. z = xlength + 1 */
+        /* front boundary, i.e. z = xlength + 1 */
         z = xlength[2] + 1;
         for (y = 0; y <= xlength[1] + 1; y++)
             for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = FREE_SLIP;
+                if (flagField[(z - 1) * (xlength[0] + 2) * (xlength[1] + 2) + (xlength[0] + 2) * y + x] == NO_SLIP)
+                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+                else
+                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = FREE_SLIP;
 
-         /* back boundary */
+        /* back boundary */
         z = 0;
         for (y = 0; y <= xlength[1] + 1; y++)
             for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = FREE_SLIP;
+                if (flagField[(z + 1) * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] == NO_SLIP)
+                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+                else
+                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = FREE_SLIP;
 
 
         /* left boundary */
@@ -213,7 +219,7 @@ void initialiseFields(double *collideField, double *streamField, int *flagField,
                 flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = OUTFLOW;
 
 
-         /* top boundary */
+        /* top boundary */
         y = xlength[1] + 1;
         for (z = 0; z <= xlength[2] + 1; z++)
             for (x = 0; x <= xlength[0] + 1; x++)
@@ -227,7 +233,7 @@ void initialiseFields(double *collideField, double *streamField, int *flagField,
 
 
         /* step */
-        for (z = 1; z <= xlength[2]; z++)
+        for (z = 0; z <= xlength[2] + 1; z++)
             for (y = 1; y <= xlength[1]/2; y++) /* integer division on purpose, half of the channel is blocked by step */
                 for (x = 1; x <= xlength[1]/2; x++)
                     flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
@@ -236,7 +242,7 @@ void initialiseFields(double *collideField, double *streamField, int *flagField,
     if (!strcmp(problem, "planeShearFlow"))
     {
 
-         /* front boundary, i.e. z = xlength + 1 */
+        /* front boundary, i.e. z = xlength + 1 */
         z = xlength[2] + 1;
         for (y = 0; y <= xlength[1] + 1; y++)
             for (x = 0; x <= xlength[0] + 1; x++)

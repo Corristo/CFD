@@ -442,18 +442,25 @@ int **read_pgm(const char *filename)
     int i1, j1;
     int **pic = NULL;
 
+    int rank;
+    MPI_Comm_rank( MPI_COMM_WORLD, &rank);
+
 
     if ((input=fopen(filename,"rb"))==0)
     {
        char szBuff[80];
+       if (rank == 0)
+       {
            sprintf( szBuff, "Can not read file %s !!!", filename );
            ERROR( szBuff );
+        }
     }
 
     /* check for the right "magic number" */
     if ( fread(line,1,3,input)!=3 )
     {
             fclose(input);
+        if (rank == 0)
             ERROR("Error Wrong Magic field!");
     }
 
@@ -464,8 +471,8 @@ int **read_pgm(const char *filename)
 
     /* read the width and height */
     sscanf(line,"%d %d\n",&xsize,&ysize);
-
-    printf("Image size: %d x %d\n", xsize,ysize);
+    if (rank == 0)
+        printf("Image size: %d x %d\n", xsize,ysize);
 
     /* read # of gray levels */
     if(fgets(line,sizeof line,input));
@@ -473,7 +480,8 @@ int **read_pgm(const char *filename)
 
     /* allocate memory for image */
     pic = imatrix(0,xsize+2,0,ysize+2);
-    printf("Image initialised...\n");
+    if (rank == 0)
+        printf("Image initialised...\n");
 
     /* read pixel row by row */
     for(j1=1; j1 < ysize+1; j1++)
@@ -486,7 +494,8 @@ int **read_pgm(const char *filename)
             if (byte==EOF)
             {
                 fclose(input);
-                ERROR("read failed");
+                if (rank == 0)
+                    ERROR("read failed");
             }
             else
             {

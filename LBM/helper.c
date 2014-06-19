@@ -559,3 +559,64 @@ int **read_pgm(const char *filename)
 
     return pic;
 }
+
+int ***read_vtk(const char *filename)
+{
+    FILE *input = NULL;
+    char line[1024], trashstring[1024];
+    int levels;
+    int xsize, ysize, zsize;
+    int i1, j1, k1;
+    int **pic = NULL;
+
+
+    if ((input=fopen(filename,"rb"))==0)
+    {
+       char szBuff[80];
+           sprintf( szBuff, "Can not read file %s !!!", filename );
+           ERROR( szBuff );
+    }
+
+    /* skip the comments */
+    do
+    if(fgets(line,sizeof line,input));
+    while(*line=='#');
+
+    /* read the width and height */
+    fgets(line,sizeof line,input);
+    fgets(line,sizeof line,input);
+    fgets(line,sizeof line,input);
+    sscanf(line,"%s %d %d %d\n", trashstring, &xsize,&ysize, &zsize);
+
+    printf("Image size: %d x %d\n x %d", xsize,ysize, zsize);
+
+//    /* read # of gray levels */
+//    if(fgets(line,sizeof line,input));
+//    sscanf(line,"%d\n",&levels);
+//
+//    /* allocate memory for image */
+//    pic = imatrix(0,xsize+2,0,ysize+2);
+//    printf("Image initialised...\n");
+//
+//    /* read pixel row by row */
+//    for(j1=1; j1 < ysize+1; j1++)
+//    {
+//        for (i1=1; i1 < xsize+1; i1++)
+//        {
+//            int byte;
+//            if(fscanf(input, "%d", &byte));
+//
+//            if (byte==EOF)
+//            {
+//                fclose(input);
+//                ERROR("read failed");
+//            }
+//            else
+//            {
+//                pic[i1][ysize+1-j1] = byte;
+//                // printf("%d,%d: %d\n", i1,ysize+1-j1,byte);
+//            }
+//         }
+//    }
+
+}
