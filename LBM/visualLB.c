@@ -19,8 +19,8 @@ void write_vtkHeader( FILE *fp, int *xlength)
     fprintf(fp,"ASCII\n");
     fprintf(fp,"\n");
     fprintf(fp,"DATASET STRUCTURED_GRID\n");
-    fprintf(fp,"DIMENSIONS  %i %i %i \n", xlength[0] + 2, xlength[1] + 2, xlength[2] + 2);
-    fprintf(fp,"POINTS %i float\n", (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2));
+    fprintf(fp,"DIMENSIONS  %i %i %i \n", xlength[0] , xlength[1] , xlength[2] );
+    fprintf(fp,"POINTS %i float\n", (xlength[0] ) * (xlength[1] ) * (xlength[2] ));
     fprintf(fp,"\n");
 }
 
@@ -34,9 +34,9 @@ void write_vtkPointCoordinates( FILE *fp, int *xlength)
     int y = 0;
     int z = 0;
 
-    for(z = 0; z <= xlength[2] + 1; z++)
-        for(y = 0; y <= xlength[1] + 1; y++)
-            for ( x = 0; x <= xlength[0] + 1; x++)
+    for(z = 1; z <= xlength[2]; z++)
+        for(y = 1; y <= xlength[1] ; y++)
+            for ( x = 1; x <= xlength[0] ; x++)
                 fprintf(fp, "%f %f %f\n", originX+(double) x , originY + (double) y,  originZ + (double) z);
 
 
@@ -63,7 +63,7 @@ void writeVtkOutput(const double * const collideField, const int * const flagFie
     write_vtkHeader( fp, xlength);
     write_vtkPointCoordinates(fp, xlength);
 
-    fprintf(fp,"POINT_DATA %i \n", (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2));
+    fprintf(fp,"POINT_DATA %i \n", (xlength[0]) * (xlength[1]) * (xlength[2]));
 
     fprintf(fp,"\n");
     fprintf(fp, "VECTORS velocity float\n");
@@ -92,9 +92,9 @@ void writeVtkOutput(const double * const collideField, const int * const flagFie
             }
  fprintf(fp, "SCALARS boundaryType integer 1 \n");
     fprintf(fp, "LOOKUP_TABLE default \n");
-    for(z = 0; z <= xlength[2] + 1; z++)
-        for(y = 0; y <= xlength[1] + 1; y++)
-            for (x = 0; x <= xlength[0] + 1; x++)
+    for(z = 1; z <= xlength[2] ; z++)
+        for(y = 1; y <= xlength[1] ; y++)
+            for (x = 1; x <= xlength[0] ; x++)
             {
                 currentCellIndex = (z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x);
                 fprintf(fp, "%d\n", flagField[currentCellIndex]);
