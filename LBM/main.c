@@ -29,7 +29,6 @@ int main(int argc, char *argv[])
 		PAPI_TOT_CYC,
 		PAPI_L2_DCM,
 		PAPI_L2_DCA };
-    int papi_integer;
 
 	PAPI_library_init(PAPI_VER_CURRENT);
 
@@ -56,7 +55,7 @@ int main(int argc, char *argv[])
 
         printf("Progress:     ");
 
-        papi_integer = PAPI_start_counters( PAPI_events, 3 );
+        PAPI_start_counters( PAPI_events, 3 );
         for(int t = 0; t < timesteps; t++)
         {
             double *swap = NULL;
@@ -66,13 +65,13 @@ int main(int argc, char *argv[])
             collideField = streamField;
             streamField = swap;
 
-            doCollision(collideField, flagField, &tau, xlength);
+            doCollisionAVX(collideField, flagField, &tau, xlength);
 
             treatBoundary(collideField, flagField, bddParams, xlength);
 
             if (t % timestepsPerPlotting == 0)
             {
-                writeVtkOutput(collideField, flagField, "./Paraview/output", (unsigned int) t / timestepsPerPlotting, xlength);
+//                writeVtkOutput(collideField, flagField, "./Paraview/output", (unsigned int) t / timestepsPerPlotting, xlength);
                 /** debugging code */
 //                 /* create reference files */
 //                FILE *fp = NULL;
@@ -110,7 +109,7 @@ int main(int argc, char *argv[])
 //                                    if (fabs(collideField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2 ) + x + (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2) * i] - exactCollideField[PARAMQ * (z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i]) > 1e-4)
 //                                        error = 1;
 //                if (error)
-//                    printf("ERROR: Process %d has a different collideField in timestep %d\n", 0, t);
+//                    printf("ERROR: Different collideField in timestep %d\n", t);
 //                free(exactCollideField);
                 /** end of debugging code */
             }
@@ -132,7 +131,7 @@ int main(int argc, char *argv[])
 
         printf("%lld L2 cache misses (%.3lf%% misses) in %lld cycles\n",
 		counters[1],
-		(double)counters[1] / (double)counters[2],
+		(double)counters[1] / (double)counters[2] * 100,
 		counters[0] );
         free(collideField);
         free(streamField);
