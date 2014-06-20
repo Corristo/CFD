@@ -19,7 +19,7 @@ void treatBoundary(double *collideField, int* flagField, const double * const bd
     int freeSlipNeighbours[3];
     double referenceDensity = 1.0;
     double inflowFeq[PARAMQ];
-    computeFeq(&referenceDensity, bddParams, inflowFeq);
+    computeFeqAVX(&referenceDensity, bddParams, inflowFeq);
 
     /* top boundary
      * only need to set directions 0, 5, 6, 7, 14 */
@@ -205,7 +205,7 @@ void compute_boundary(double *collideField, const double * const bddParams, int 
             neighbourCellIndex = (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - directionToUpdate) * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
             computeDensity(collideField + (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2));
             computeVelocity(collideField + (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity, (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2));
-            computeFeq(&referenceDensity, velocity, feq);
+            computeFeqAVX(&referenceDensity, velocity, feq);
             collideField[currentCellIndex] = feq[PARAMQ - directionToUpdate - 1] + feq[directionToUpdate] - collideField[neighbourCellIndex];
         }
         break;
@@ -222,7 +222,7 @@ void compute_boundary(double *collideField, const double * const bddParams, int 
             computeDensity(collideField +  (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2));
             computeVelocity(collideField +  (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity, (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2));
             density = referenceDensity + pressureIn;
-            computeFeq(&density, velocity, feq);
+            computeFeqAVX(&density, velocity, feq);
             collideField[currentCellIndex] = feq[PARAMQ - directionToUpdate - 1] + feq[directionToUpdate] - collideField[neighbourCellIndex];
         }
         break;
