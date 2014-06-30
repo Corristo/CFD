@@ -15,6 +15,9 @@ int main(int argc, char *argv[])
 {
     double *collideField = NULL;
     double *streamField = NULL;
+    double *velocities[3];
+    double *densities;
+
     char problem[100];
     char pgmInput[1000];
     int *flagField = NULL;
@@ -32,7 +35,7 @@ int main(int argc, char *argv[])
 
 	PAPI_library_init(PAPI_VER_CURRENT);
 
-//    double * exactCollideField;
+    double * exactCollideField;
 
 
     if(readParameters(xlength, &tau, bddParams, &timesteps, &timestepsPerPlotting, problem, pgmInput, argc, argv) == 0)
@@ -41,6 +44,10 @@ int main(int argc, char *argv[])
         collideField = (double*) malloc((size_t) sizeof(double) * PARAMQ * (xlength[0] + 2)*(xlength[1] + 2)*(xlength[2] + 2));
         streamField = (double*) malloc((size_t) sizeof(double) * PARAMQ * (xlength[0] + 2)*(xlength[1] + 2)*(xlength[2] + 2));
         flagField = (int *) malloc((size_t) sizeof (int) * (xlength[0] + 2)*(xlength[1] + 2)*(xlength[2] + 2));
+//        densities = (double *) malloc((size_t) sizeof(double) * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2));
+//        velocities[0] = (double *) malloc((size_t) sizeof(double) * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2));
+//        velocities[1] = (double *) malloc((size_t) sizeof(double) * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2));
+//        velocities[2] = (double *) malloc((size_t) sizeof(double) * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2));
         initialiseFields(collideField, streamField, flagField, xlength, problem, pgmInput);
 
         /** debugging code */
@@ -60,12 +67,15 @@ int main(int argc, char *argv[])
         {
             double *swap = NULL;
 
-            doStreaming(collideField, streamField, flagField, xlength);
+//            doStreamingAVX(collideField, streamField, flagField, xlength);
+//            doStreamingAVXv2(collideField, streamField, flagField, xlength, densities, velocities);
+            doStreamingAndCollisionAVX(collideField, streamField, flagField, xlength, tau);
             swap = collideField;
             collideField = streamField;
             streamField = swap;
 
-            doCollisionAVX(collideField, flagField, &tau, xlength);
+//            doCollisionAVX(collideField, flagField, &tau, xlength);
+//            doCollisionAVXv2(collideField, flagField, tau, xlength, densities, velocities);
 
             treatBoundary(collideField, flagField, bddParams, xlength);
 
@@ -136,6 +146,10 @@ int main(int argc, char *argv[])
         free(collideField);
         free(streamField);
         free(flagField);
+//        free(velocities[0]);
+//        free(velocities[1]);
+//        free(velocities[2]);
+//        free(densities);
 
     }
     return 0;

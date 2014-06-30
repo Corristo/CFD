@@ -15,6 +15,8 @@ void computePostCollisionDistributionsAVX (double *currentCell, const double * c
  *  equilibrium distributions. Carries out BGK update.
  */
 void doCollision(double *collideField,int *flagField,const double * const tau,int *xlength);
+void doCollisionSSE(double *collideField, int *flagField,const double tau,int *xlength, double * densities, double ** velocities);
+void doCollisionAVXv2(double *collideField, int *flagField,const double  tau, int *xlength, double * densities, double ** velocities);
 void doCollisionAVX(double *collideField, int *flagField, const double * const tau, int *xlength);
 #endif
 

@@ -12,13 +12,14 @@
  *  bddParams[5]   Moving wall velocity in y direction
  *  bddParams[6]   Moving wall velocity in z direction
  */
+
 void treatBoundary(double *collideField, int* flagField, const double * const bddParams, int *xlength)
 {
     int i, x, y, z, neighbourCoordX, neighbourCoordY, neighbourCoordZ, currentCellIndex, neighbourCellIndex;
     int coordinate[3];
     int freeSlipNeighbours[3];
     double referenceDensity = 1.0;
-    double inflowFeq[PARAMQ];
+    double inflowFeq[PARAMQ] __attribute__((aligned(32)));
     computeFeqAVX(&referenceDensity, bddParams, inflowFeq);
 
     /* top boundary
@@ -113,23 +114,23 @@ void treatBoundary(double *collideField, int* flagField, const double * const bd
 
     /* inner boundary cells
      * assumes inner boundary cells can only be NO_SLIP */
-    for (i = 0; i < PARAMQ; i++)
-        for (z = 1; z <= xlength[2]; z++)
-            for (y = 1; y <= xlength[1]; y++)
-                for(x = 1; x <= xlength[0]; x++)
-                    if (flagField[x + (xlength[0] + 2) * y + (xlength[0] + 2) * (xlength[1] + 2) * z])
-                    {
-                        neighbourCoordX = x + LATTICEVELOCITIES[i][0];
-                        neighbourCoordY = y + LATTICEVELOCITIES[i][1];
-                        neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
-                        if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
-                            if (!flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ])
-                            {
-                                currentCellIndex = z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x + i * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
-                                neighbourCellIndex = neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX + (PARAMQ - 1 - i) * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
-                                collideField[currentCellIndex] = collideField[neighbourCellIndex];
-                            }
-                    }
+//    for (i = 0; i < PARAMQ; i++)
+//        for (z = 1; z <= xlength[2]; z++)
+//            for (y = 1; y <= xlength[1]; y++)
+//                for(x = 1; x <= xlength[0]; x++)
+//                    if (flagField[x + (xlength[0] + 2) * y + (xlength[0] + 2) * (xlength[1] + 2) * z])
+//                    {
+//                        neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+//                        neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+//                        neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+//                        if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+//                            if (!flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ])
+//                            {
+//                                currentCellIndex = z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x + i * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
+//                                neighbourCellIndex = neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX + (PARAMQ - 1 - i) * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
+//                                collideField[currentCellIndex] = collideField[neighbourCellIndex];
+//                            }
+//                    }
 }
 
 /** boundary helper function */
@@ -140,7 +141,7 @@ void compute_boundary(double *collideField, const double * const bddParams, int 
     double density;
     const double * const wallVelocity = bddParams + 4;
     double referenceDensity = 1.0;
-    double feq[PARAMQ];
+    double feq[PARAMQ] __attribute__((aligned(32)));
     double velocity[3];
     const double pressureIn = bddParams[3];
 

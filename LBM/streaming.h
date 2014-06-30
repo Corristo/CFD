@@ -5,8 +5,11 @@
  *  collideField to streamField.
  */
 void doStreaming(double *collideField, double *streamField,int *flagField,int *xlength);
-void doStreamingSSE(double *collideField, double *streamField,int *flagField,int *xlength);
+void doStreamingSSE(double *collideField, double *streamField,int *flagField,int *xlength, double * densities, double ** velocities);
 void doStreamingAVX(double *collideField, double *streamField,int *flagField,int *xlength);
+void doStreamingAndCollision(double *collideField, double *streamField,int *flagField,int *xlength, const double tau);
+void doStreamingAndCollisionAVX(double *collideField, double *streamField,int *flagField,int *xlength, const double tau);
+void doStreamingAVXv2(double *collideField, double *streamField,int *flagField,int *xlength, double * densities, double ** velocities);
 
 #endif
 
