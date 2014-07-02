@@ -2,6 +2,8 @@
 #include "LBDefinitions.h"
 #include "helper.h"
 #include <immintrin.h>
+#include <omp.h>
+
 void doStreamingAndCollision(double *collideField, double *streamField,int *flagField,int *xlength, const double tau)
 {
     int x ,y ,z, j;
@@ -11,13 +13,17 @@ void doStreamingAndCollision(double *collideField, double *streamField,int *flag
 
     // Philip Neumann approach
     int numberOfCells = (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
-    j = (xlength[0] + 2) * (xlength[1] + 3) + 1;
+
+
+    #pragma omp parallel for default(none), private(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, density, velocity, tmpFeq0, tmpFeq1, tmpFeq2, dotProduct, x, y, j), firstprivate(numberOfCells, tau), shared(xlength, streamField, collideField) schedule(static)
     for (z = 1; z <= xlength[2]; z++)
     {
+        j = 1 + (xlength[0] + 2) + (xlength[0] + 2) * (xlength[1] + 2) * z;
         for (y = 1; y <= xlength[1]; y++)
         {
             for (x = 1; x <= xlength[0]; x++)
             {
+
                 density = velocity[0] = velocity[1] = velocity[2] = 0;
                 // load direction i = 0;
                 // c_0 = (0, -1, -1)
@@ -264,9 +270,13 @@ void doStreamingAndCollisionAVX(double *collideField, double *streamField,int *f
 
     // Neumann approach
     int numberOfCells = (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
-    j = (xlength[0] + 2) * (xlength[1] + 3) + 1;
+
+
+
+    #pragma omp parallel for default(none), private(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, density, velocity, tmpFeq0, tmpFeq1, tmpFeq2, dotProduct, x, y, j, densityVector, velocityX, velocityY, velocityZ, f0v, f1v, f2v, f3v, f4v, f5v, f6v, f7v, f8v, f9v, f10v, f11v, f12v, f13v, f14v, f15v, f16v, f17v, f18v, tmpFeq0v, tmpFeq1v, tmpFeq2v, dotProductVector), firstprivate(numberOfCells, tau, cs2v, tauInvVector, oneVector, zeroVector, weight3, weight18, weight36),  shared(collideField, streamField, xlength) schedule(static)
     for (z = 1; z <= xlength[2]; z++)
     {
+        j = (xlength[0] + 2) * (xlength[1] + 2) * z + xlength[0] + 3;
         for (y = 1; y <= xlength[1]; y++)
         {
             for (x = 1; x <= xlength[0] - 4; x += 4)
