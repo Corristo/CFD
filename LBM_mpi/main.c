@@ -11,8 +11,8 @@
 #include "communication.h"
 #include <time.h>
 #include <unistd.h>
-#include "parallel.h"
-
+#include <omp.h>
+#include <sys/time.h>
 
 int main(int argc, char *argv[])
 {
@@ -23,6 +23,7 @@ int main(int argc, char *argv[])
     int *flagField = NULL;
     clock_t begin, end;
     double time_spent;
+    struct timeval time_start, time_end;
 
     int xlength[3], local_xlength[3], timesteps, timestepsPerPlotting;
     double tau, bddParams[7];
@@ -36,8 +37,9 @@ int main(int argc, char *argv[])
     // send and read MPI datatypes for all possible directions :
     // [0: left, 1: right, 2: top, 3: bottom, 4: front, 5: back]
     MPI_Datatype MPISendTypes[6], MPIRecvTypes[6];
+    MPI_Request MPISendReq[2], MPIRecvReq[2];
 
-//    double * exactCollideField; // for debugging only
+    double * exactCollideField; // for debugging only
 
 
 
@@ -56,7 +58,7 @@ int main(int argc, char *argv[])
             return -1;
         }
         begin = clock();
-        time_t start = time(NULL);
+        gettimeofday(&time_start, NULL);
 
 
         int iCoord, jCoord, kCoord; // position of the domain in the decomposition; needed to compute neighbouring processes and for vtk output
@@ -77,19 +79,30 @@ int main(int argc, char *argv[])
         for(int t = 0; t < timesteps; t++)
         {
             double *swap = NULL;
-            communicateBoundaryValues(local_xlength, MPISendTypes, MPIRecvTypes, collideField, neighbours, 0); // communicate along x - axis (right to left - left to right)
-            communicateBoundaryValues(local_xlength, MPISendTypes, MPIRecvTypes, collideField, neighbours, 2); // communicate along z - axis (back to front - front to back)
-            communicateBoundaryValues(local_xlength, MPISendTypes, MPIRecvTypes, collideField, neighbours, 1); // communicate along y - axis (bottom to top - top to bottom)
-            doStreaming(collideField, streamField, flagField, local_xlength);
+
+
+            communicateBoundaryValues( MPISendTypes, MPIRecvTypes, collideField, neighbours, MPISendReq, MPIRecvReq, 0); // communicate along x - axis (right to left - left to right)
+            doStreamingAndCollisionAVX(collideField, streamField, flagField, local_xlength, tau, 1);
+            checkRequestCompletion(MPISendReq, MPIRecvReq, 0, neighbours);
+
+            communicateBoundaryValues( MPISendTypes, MPIRecvTypes, collideField, neighbours, MPISendReq, MPIRecvReq, 2); // communicate along z - axis (back to front - front to back)
+            doStreamingAndCollisionAVX(collideField, streamField, flagField, local_xlength, tau, 2);
+            checkRequestCompletion(MPISendReq, MPIRecvReq, 2, neighbours);
+
+            communicateBoundaryValues( MPISendTypes, MPIRecvTypes, collideField, neighbours, MPISendReq, MPIRecvReq, 1); // communicate along y - axis (bottom to top - top to bottom)
+            doStreamingAndCollisionAVX(collideField, streamField, flagField, local_xlength, tau, 3);
+            checkRequestCompletion(MPISendReq, MPIRecvReq, 1, neighbours);
+
+            doStreamingAndCollisionAVX(collideField, streamField, flagField, local_xlength, tau, 4);
+
             swap = collideField;
             collideField = streamField;
             streamField = swap;
 
-            doCollision(collideField, flagField, &tau, local_xlength);
             treatBoundary(collideField, flagField, bddParams, local_xlength);
 
-            if (t % timestepsPerPlotting == 0)
-                writeVtkOutput(collideField, flagField, "./Paraview/output", (unsigned int) t / timestepsPerPlotting, xlength, local_xlength, rank, iCoord, jCoord, kCoord, iProc, jProc, kProc);
+//            if (t % timestepsPerPlotting == 0)
+//                writeVtkOutput(collideField, flagField, "./Paraview/output", (unsigned int) t / timestepsPerPlotting, xlength, local_xlength, rank, iCoord, jCoord, kCoord, iProc, jProc, kProc);
 
             if (!rank)
             {
@@ -99,11 +112,11 @@ int main(int argc, char *argv[])
             }
 
             /** debugging code: check collideField */
-            /* check correctness of collideField with reference data */
+            // check correctness of collideField with reference data
 //            if (t % timestepsPerPlotting == 0)
 //            {
 //
-//                exactCollideField = (double*) malloc((size_t) sizeof(double) * PARAMQ * (xlength[0] + 2)*(xlength[1] + 2)*(xlength[2] + 2));
+//                exactCollideField = (double*) malloc((size_t) sizeof(double) * PARAMQ * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2));
 //
 //                int x, y, z, i;
 //                FILE *fp = NULL;
@@ -122,7 +135,7 @@ int main(int argc, char *argv[])
 //                            for(x = 1; x <= local_xlength[0]; x++)
 //                                for (i = 0; i < PARAMQ; i++)
 //                                    if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FLUID)
-//                                       if (fabs(collideField[PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + i] - exactCollideField[PARAMQ * ((z + kCoord * (xlength[2] / kProc)) * (xlength[0] + 2) * (xlength[1] + 2) + (y + jCoord * (xlength[1]/jProc)) * (xlength[0] + 2) + (x + iCoord * (xlength[0] / iProc) )) + i]) > 1e-5)
+//                                       if (fabs(collideField[(z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + i * (local_xlength[0] + 2) * (local_xlength[1] + 2) * (local_xlength[2] + 2)] - exactCollideField[PARAMQ * ((z + kCoord * (xlength[2] / kProc)) * (xlength[0] + 2) * (xlength[1] + 2) + (y + jCoord * (xlength[1]/jProc)) * (xlength[0] + 2) + (x + iCoord * (xlength[0] / iProc) )) + i]) > 1e-4)
 //                                            error = 1;
 //                    if (error)
 //                        printf("ERROR: Process %d has a different collideField in timestep %d\n",rank, t);
@@ -146,10 +159,11 @@ int main(int argc, char *argv[])
             printf("\b\b\b\b100%%\n");
             end = clock();
             time_spent = (double) (end - begin) / CLOCKS_PER_SEC;
+            gettimeofday(&time_end, NULL);
 
             printf("Running time (CPU time): %.2fs\n", time_spent);
-            printf("Running time (Wall clock): %2.fs\n", (double)(time(NULL) - start) );
-            printf("MLUPS: %.3f\n", ((double) (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2) * timesteps) / (1000000.0 * time_spent));
+            printf("Running time (Wall clock): %.2fs\n", ( (double) (( time_end.tv_sec - time_start.tv_sec) * 1000000u + time_end.tv_usec - time_start.tv_usec) )/ 1e6);
+            printf("MLUPS: %.3f\n", ((double) (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2) * timesteps) / (1000000.0 * ((time_end.tv_sec - time_start.tv_sec) * 1000000u + time_end.tv_usec - time_start.tv_usec) / 1e6));
         }
 
         free(collideField);

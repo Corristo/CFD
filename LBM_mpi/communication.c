@@ -4,268 +4,19 @@
 #include "LBDefinitions.h"
 #include <stdio.h>
 
-void extract( int * local_xlength, double * sendBuffer, double * collideField, int axis, int step )
+
+void communicateBoundaryValues ( MPI_Datatype * MPISendTypes, MPI_Datatype * MPIRecvTypes, double * collideField, int * neighbours, MPI_Request * MPISendReq, MPI_Request * MPIRecvReq, int axis)
 {
-    // axis: coordinate direction in which to send, i.e. 0 -> x direction, 1 -> y direction, 2 -> z direction
-    // step: in combination with the axis defines the neighbour to which to send, i.e.
-//                step    0       1
-//              axis
-//                0       left    right
-//                1       top     bottom
-//                2       front   back
-//
-
-    int x, y, z, i, bufferIndex;
-
-    int x_start, x_end, y_start, y_end, z_start, z_end;
-    const int * velocitiesToCopy;
-
-    switch(axis)
-    {
-    case 0:
-        if (step == 0)
-        {
-            velocitiesToCopy = VELOCITIESLEFTOUT;
-            x_start = x_end = 1;
-        }
-        else
-        {
-            velocitiesToCopy = VELOCITIESRIGHTOUT;
-            x_start = x_end = local_xlength[0];
-        }
-        y_start = 0;
-        y_end = local_xlength[1] + 1;
-        z_start = 0;
-        z_end = local_xlength[2] + 1;
-        break;
-    case 1:
-        if (step == 0)
-        {
-            velocitiesToCopy = VELOCITIESTOPOUT;
-            y_start = y_end = local_xlength[1];
-        }
-        else
-        {
-            velocitiesToCopy = VELOCITIESBOTTOMOUT;
-            y_start = y_end = 1;
-        }
-        x_start = 0;
-        x_end = local_xlength[0] + 1;
-        z_start = 0;
-        z_end = local_xlength[2] + 1;
-        break;
-    default: // case 2:
-        if (step == 0)
-        {
-            velocitiesToCopy = VELOCITIESFRONTOUT;
-            z_start = z_end = local_xlength[2];
-        }
-        else
-        {
-            velocitiesToCopy = VELOCITIESBACKOUT;
-            z_start = z_end = 1;
-        }
-        x_start = 0;
-        x_end = local_xlength[0] + 1;
-        y_start = 0;
-        y_end = local_xlength[1] + 1;
-        break;
-    }
-    // actual extraction
-    for (z = z_start; z <= z_end; z++)
-        for (y = y_start; y <= y_end; y++)
-            for (x = x_start; x <= x_end; x++)
-                for (i = 0; i < 5; i++)
-                {
-                    switch(axis)
-                    {
-                    case 0:
-                        bufferIndex = 5 * ((local_xlength[1] + 2) * z + y) + i;
-                        break;
-                    case 1:
-                        bufferIndex = 5 * ((local_xlength[0] + 2) * z + x) + i;
-                        break;
-                    default: // case 2:
-                        bufferIndex = 5 * ((local_xlength[0] + 2) * y + x) + i;
-                        break;
-                    }
-                    sendBuffer[bufferIndex] = collideField[PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + velocitiesToCopy[i]];
-                }
-}
-
-void inject( int * local_xlength, double * readBuffer, int * flagField, double * collideField, int axis, int step )
-{
-    // axis: coordinate direction in which to send, i.e. 0 -> x direction, 1 -> y direction, 2 -> z direction
-    // step: in combination with the axis defines the neighbour from which the data was recieved, i.e.
-//                step    0       1
-//              axis
-//                0       right   left
-//                1       bottom  top
-//                2       back    front
-
-
-    int x, y, z, i, bufferIndex;
-
-    int x_start, x_end, y_start, y_end, z_start, z_end;
-    const int * velocitiesToCopy;
-
-    switch(axis)
-    {
-    case 0:
-        if (step == 0)
-        {
-            velocitiesToCopy = VELOCITIESLEFTOUT;
-            x_start = x_end = local_xlength[0] + 1;
-        }
-        else
-        {
-            velocitiesToCopy = VELOCITIESRIGHTOUT;
-            x_start = x_end = 0;
-        }
-        y_start = 1;
-        y_end = local_xlength[1];
-        z_start = 1;
-        z_end = local_xlength[2];
-        break;
-    case 1:
-        if (step == 0)
-        {
-            velocitiesToCopy = VELOCITIESTOPOUT;
-            y_start = y_end = 0;
-        }
-        else
-        {
-            velocitiesToCopy = VELOCITIESBOTTOMOUT;
-            y_start = y_end = local_xlength[1] + 1;
-        }
-        x_start = 0;
-        x_end = local_xlength[0] + 1;
-        z_start = 0;
-        z_end = local_xlength[2] + 1;
-        break;
-    default: // case 2:
-        if (step == 0)
-        {
-            velocitiesToCopy = VELOCITIESFRONTOUT;
-            z_start = z_end = 0;
-        }
-        else
-        {
-            velocitiesToCopy = VELOCITIESBACKOUT;
-            z_start = z_end = local_xlength[2] + 1;
-        }
-        x_start = 0;
-        x_end = local_xlength[0] + 1;
-        y_start = 1;
-        y_end = local_xlength[1];
-        break;
-    }
-
-    // actual injection
-    for (z = z_start; z <= z_end; z++)
-        for (y = y_start; y <= y_end; y++)
-            for (x = x_start; x <= x_end; x++)
-                if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == PARALLEL_BOUNDARY || flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FREE_SLIP)
-                    for (i = 0; i < 5; i++)
-                    {
-                        switch(axis)
-                        {
-                        case 0:
-                            bufferIndex = 5 * ((local_xlength[1] + 2) * z + y) + i;
-                            break;
-                        case 1:
-                            bufferIndex = 5 * ((local_xlength[0] + 2) * z + x) + i;
-                            break;
-                        default: // case 2:
-                            bufferIndex = 5 * ((local_xlength[0] + 2) * y + x) + i;
-                            break;
-                        }
-
-                        collideField[PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + velocitiesToCopy[i]] = readBuffer[bufferIndex];
-                    }
-
-    // inject free-slip cells at local boundaries in which normally we would not inject because of the sending scheme, e.g. top and bottom
-    // walls when sending in direction of the x-axis
-    if (axis == 0)
-    {
-        x = x_start;
-        z = 0;
-        for (y = 0; y <= local_xlength[1] + 1; y ++)
-            if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FREE_SLIP)
-                for (i = 0; i < 5; i++)
-                {
-                    bufferIndex = 5 * ((local_xlength[1] + 2) * z + y) + i;
-                    collideField[PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + velocitiesToCopy[i]] = readBuffer[bufferIndex];
-                }
-
-        z = local_xlength[2] + 1;
-        for (y = 0; y <= local_xlength[1] + 1; y ++)
-            if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FREE_SLIP)
-                for (i = 0; i < 5; i++)
-                {
-                    bufferIndex = 5 * ((local_xlength[1] + 2) * z + y) + i;
-                    collideField[PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + velocitiesToCopy[i]] = readBuffer[bufferIndex];
-                }
-
-        y = 0;
-        for (z = 0; z <= local_xlength[2] + 1; z ++)
-            if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FREE_SLIP)
-                for (i = 0; i < 5; i++)
-                {
-                    bufferIndex = 5 * ((local_xlength[1] + 2) * z + y) + i;
-                    collideField[PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + velocitiesToCopy[i]] = readBuffer[bufferIndex];
-                }
-
-        y = local_xlength[1] + 1;
-        for (z = 0; z <= local_xlength[2] + 1; z ++)
-            if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FREE_SLIP)
-                for (i = 0; i < 5; i++)
-                {
-                    bufferIndex = 5 * ((local_xlength[1] + 2) * z + y) + i;
-                    collideField[PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + velocitiesToCopy[i]] = readBuffer[bufferIndex];
-                }
-    }
-    if (axis == 2)
-    {
-        z = z_start;
-        y = 0;
-        for (x = 0; x <= local_xlength[0] + 1; x++)
-            if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FREE_SLIP)
-                for (i = 0; i < 5; i++)
-                {
-                    bufferIndex = 5 * ((local_xlength[0] + 2) * y + x) + i;
-                    collideField[PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + velocitiesToCopy[i]] = readBuffer[bufferIndex];
-                }
-
-        y = local_xlength[1] + 1;
-        for (x = 0; x <= local_xlength[0] + 1; x++)
-            if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FREE_SLIP)
-                for (i = 0; i < 5; i++)
-                {
-                    bufferIndex = 5 * ((local_xlength[0] + 2) * y + x) + i;
-                    collideField[PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + velocitiesToCopy[i]] = readBuffer[bufferIndex];
-                }
-    }
-
-}
-
-void communicateBoundaryValues ( int * local_xlength, MPI_Datatype * MPISendTypes, MPI_Datatype * MPIRecvTypes, double * collideField, int * neighbours, int axis)
-{
-    MPI_Status mpistatus;
     // values of axis: 0 -> x direction, 1 -> y direction, 2 -> z direction
-    if (neighbours[2 * axis] >= 0 && neighbours[2 * axis + 1] >= 0)
+    if (neighbours[2 * axis ] >= 0)
     {
-        // Swap, package id is the direction in which the recipient is located
-        MPI_Sendrecv( collideField, 1, MPISendTypes[2 * axis], neighbours[2 * axis],  2 * axis + 1, collideField, 1, MPIRecvTypes[2 * axis + 1], neighbours[2 * axis + 1], 2 * axis + 1, MPI_COMM_WORLD, &mpistatus );
-        MPI_Sendrecv( collideField, 1, MPISendTypes[2 * axis + 1], neighbours[2 * axis + 1], 2 * axis, collideField, 1, MPIRecvTypes[2 * axis], neighbours[2 * axis], 2 * axis, MPI_COMM_WORLD, &mpistatus );
+        MPI_Isend( collideField, 1, MPISendTypes[2 * axis], neighbours[2 * axis], 2 * axis + 1, MPI_COMM_WORLD, &MPISendReq[0]);
+        MPI_Irecv( collideField, 1, MPIRecvTypes[2 * axis], neighbours[2 * axis], 2 * axis, MPI_COMM_WORLD, &MPIRecvReq[0]);
     }
-    else if (neighbours[2 * axis ] >= 0)
+    if (neighbours[2 * axis + 1] >= 0)
     {
-        MPI_Sendrecv( collideField, 1, MPISendTypes[2 * axis], neighbours[2 * axis], 2 * axis + 1, collideField, 1, MPIRecvTypes[2 * axis], neighbours[2 * axis], 2 * axis, MPI_COMM_WORLD, &mpistatus );
-    }
-    else if (neighbours[2 * axis + 1] >= 0)
-    {
-        MPI_Sendrecv( collideField, 1, MPISendTypes[2 * axis + 1], neighbours[2 * axis + 1], 2 * axis, collideField, 1, MPIRecvTypes[2 * axis + 1], neighbours[2 * axis + 1], 2 * axis + 1, MPI_COMM_WORLD, &mpistatus );
+        MPI_Isend( collideField, 1, MPISendTypes[2 * axis + 1], neighbours[2 * axis + 1], 2 * axis , MPI_COMM_WORLD, &MPISendReq[1]);
+        MPI_Irecv( collideField, 1, MPIRecvTypes[2 * axis + 1], neighbours[2 * axis + 1], 2 * axis + 1, MPI_COMM_WORLD, &MPIRecvReq[1]);
     }
 }
 void computeLocalDomainSize(int * xlength, int * local_xlength, int iProc, int jProc, int kProc )
@@ -292,42 +43,7 @@ void computeLocalDomainSize(int * xlength, int * local_xlength, int iProc, int j
 //    printf( "Process %d has local dimension (%d, %d, %d)\n", rank, local_xlength[0], local_xlength[1], local_xlength[2] );
     /** end of debugging code */
 }
-void initialiseBuffers( int * local_xlength, double ** sendBuffer, double ** readBuffer, int * neighbours )
-{
-    sendBuffer[0] = sendBuffer[1] = sendBuffer[2] = sendBuffer[3] = sendBuffer[4] = sendBuffer[5] = NULL;
-    readBuffer[0] = readBuffer[1] = readBuffer[2] = readBuffer[3] = readBuffer[4] = readBuffer[5] = NULL;
 
-    if (neighbours[0] >= 0) // has left neighbour
-    {
-        sendBuffer[0] = (double*) malloc((size_t) sizeof(double) * 5 * (local_xlength[1] + 2) * (local_xlength[2] + 2));
-        readBuffer[0] = (double*) malloc((size_t) sizeof(double) * 5 * (local_xlength[1] + 2) * (local_xlength[2] + 2));
-    }
-    if (neighbours[1] >= 0) // has right neighbour
-    {
-        sendBuffer[1] = (double*) malloc((size_t) sizeof(double) * 5 * (local_xlength[1] + 2) * (local_xlength[2] + 2));
-        readBuffer[1] = (double*) malloc((size_t) sizeof(double) * 5 * (local_xlength[1] + 2) * (local_xlength[2] + 2));
-    }
-    if (neighbours[2] >= 0) // has top neighbour
-    {
-        sendBuffer[2] = (double*) malloc((size_t) sizeof(double) * 5 * (local_xlength[0] + 2) * (local_xlength[2] + 2));
-        readBuffer[2] = (double*) malloc((size_t) sizeof(double) * 5 * (local_xlength[0] + 2) * (local_xlength[2] + 2));
-    }
-    if (neighbours[3] >= 0) // has bottom neighbour
-    {
-        sendBuffer[3] = (double*) malloc((size_t) sizeof(double) * 5 * (local_xlength[0] + 2) * (local_xlength[2] + 2));
-        readBuffer[3] = (double*) malloc((size_t) sizeof(double) * 5 * (local_xlength[0] + 2) * (local_xlength[2] + 2));
-    }
-    if (neighbours[4] >= 0) // has front neighbour
-    {
-        sendBuffer[4] = (double*) malloc((size_t) sizeof(double) * 5 * (local_xlength[0] + 2) * (local_xlength[1] + 2));
-        readBuffer[4] = (double*) malloc((size_t) sizeof(double) * 5 * (local_xlength[0] + 2) * (local_xlength[1] + 2));
-    }
-    if (neighbours[5] >= 0) // has back neighbour
-    {
-        sendBuffer[5] = (double*) malloc((size_t) sizeof(double) * 5 * (local_xlength[0] + 2) * (local_xlength[1] + 2));
-        readBuffer[5] = (double*) malloc((size_t) sizeof(double) * 5 * (local_xlength[0] + 2) * (local_xlength[1] + 2));
-    }
-}
 void computeNeighbours( int iProc, int jProc, int kProc, int * neighbours )
 {
     int iCoord, jCoord, kCoord, rank;
@@ -478,16 +194,16 @@ void getSendRecvCount( const int * const local_xlength, const int * const neighb
                 if (y == 0 || y == local_xlength[1] + 1)
                 {
                     if (flagField[z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FREE_SLIP)
-                        sendCount[4] += 5;
+                        sendCount[5] += 5;
                     if (flagField[z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FREE_SLIP)
-                        recvCount[4] += 5;
+                        recvCount[5] += 5;
                 }
                 else
                 {
                     if (flagField[z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FLUID || flagField[z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == PARALLEL_BOUNDARY || flagField[z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FREE_SLIP)
-                        sendCount[4] += 5;
+                        sendCount[5] += 5;
                     if (flagField[z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == PARALLEL_BOUNDARY || flagField[z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FREE_SLIP)
-                        recvCount[4] += 5;
+                        recvCount[5] += 5;
                 }
     }
 }
@@ -495,6 +211,7 @@ void getSendRecvCount( const int * const local_xlength, const int * const neighb
 void getSendRecvIndices( const int * const local_xlength, const int * const neighbours, const int * const flagField, int ** sendIndices, int ** recvIndices )
 {
     int x, y, z, i, x_send, x_recv, y_send, y_recv, z_send, z_recv, sendcounter, recvcounter;
+    int numberOfCells = (local_xlength[0] + 2) * (local_xlength[1] + 2) * (local_xlength[2] + 2);
 
     if (neighbours[0] >= 0)
     {
@@ -508,13 +225,13 @@ void getSendRecvIndices( const int * const local_xlength, const int * const neig
                     if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_send] == FREE_SLIP)
                         for (i = 0; i < 5; i++)
                         {
-                            sendIndices[0][sendcounter] = PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_send) + VELOCITIESLEFTOUT[i];
+                            sendIndices[0][sendcounter] = numberOfCells * VELOCITIESLEFTOUT[i] + (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_send);
                             sendcounter++;
                         }
                     if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_recv] == FREE_SLIP)
                         for (i = 0; i < 5; i++)
                         {
-                            recvIndices[0][recvcounter] = PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_recv) + VELOCITIESRIGHTOUT[i];
+                            recvIndices[0][recvcounter] = numberOfCells * VELOCITIESRIGHTOUT[i] + (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_recv);
                             recvcounter++;
                         }
                 }
@@ -523,13 +240,13 @@ void getSendRecvIndices( const int * const local_xlength, const int * const neig
                     if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_send] == FLUID)
                         for (i = 0; i < 5; i++)
                         {
-                            sendIndices[0][sendcounter] = PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_send) + VELOCITIESLEFTOUT[i];
+                            sendIndices[0][sendcounter] = numberOfCells * VELOCITIESLEFTOUT[i] + (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_send);
                             sendcounter++;
                         }
                     if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_recv] == PARALLEL_BOUNDARY)
                         for (i = 0; i < 5; i++)
                         {
-                            recvIndices[0][recvcounter] = PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_recv) + VELOCITIESRIGHTOUT[i];
+                            recvIndices[0][recvcounter] = numberOfCells * VELOCITIESRIGHTOUT[i] + (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_recv);
                             recvcounter++;
                         }
                 }
@@ -547,13 +264,13 @@ void getSendRecvIndices( const int * const local_xlength, const int * const neig
                     if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_send] == FREE_SLIP)
                         for (i = 0; i < 5; i++)
                         {
-                            sendIndices[1][sendcounter] = PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_send) + VELOCITIESRIGHTOUT[i];
+                            sendIndices[1][sendcounter] = numberOfCells * VELOCITIESRIGHTOUT[i] + (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_send);
                             sendcounter++;
                         }
                     if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_recv] == FREE_SLIP)
                         for (i = 0; i < 5; i++)
                         {
-                            recvIndices[1][recvcounter] = PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_recv) + VELOCITIESLEFTOUT[i];
+                            recvIndices[1][recvcounter] = numberOfCells * VELOCITIESLEFTOUT[i] + (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_recv);
                             recvcounter++;
                         }
                 }
@@ -562,13 +279,13 @@ void getSendRecvIndices( const int * const local_xlength, const int * const neig
                     if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_send] == FLUID)
                         for (i = 0; i < 5; i++)
                         {
-                            sendIndices[1][sendcounter] = PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_send) + VELOCITIESRIGHTOUT[i];
+                            sendIndices[1][sendcounter] = numberOfCells * VELOCITIESRIGHTOUT[i] + (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_send);
                             sendcounter++;
                         }
                     if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_recv] == PARALLEL_BOUNDARY)
                         for (i = 0; i < 5; i++)
                         {
-                            recvIndices[1][recvcounter] = PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_recv) + VELOCITIESLEFTOUT[i];
+                            recvIndices[1][recvcounter] = numberOfCells * VELOCITIESLEFTOUT[i] + (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_recv);
                             recvcounter++;
                         }
                 }
@@ -585,13 +302,13 @@ void getSendRecvIndices( const int * const local_xlength, const int * const neig
                 if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_send * (local_xlength[0] + 2) + x] == FLUID || flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_send * (local_xlength[0] + 2) + x] == FREE_SLIP || flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_send * (local_xlength[0] + 2) + x] == PARALLEL_BOUNDARY)
                     for (i = 0; i < 5; i++)
                     {
-                        sendIndices[2][sendcounter] = PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_send * (local_xlength[0] + 2) + x) + VELOCITIESTOPOUT[i];
+                        sendIndices[2][sendcounter] = numberOfCells * VELOCITIESTOPOUT[i] + (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_send * (local_xlength[0] + 2) + x);
                         sendcounter++;
                     }
                 if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_recv * (local_xlength[0] + 2) + x] == PARALLEL_BOUNDARY || flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_recv * (local_xlength[0] + 2) + x] == FREE_SLIP )
                     for (i = 0; i < 5; i++)
                     {
-                        recvIndices[2][recvcounter] = PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_recv * (local_xlength[0] + 2) + x) + VELOCITIESBOTTOMOUT[i];
+                        recvIndices[2][recvcounter] = numberOfCells * VELOCITIESBOTTOMOUT[i] + (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_recv * (local_xlength[0] + 2) + x);
                         recvcounter++;
                     }
             }
@@ -608,13 +325,13 @@ void getSendRecvIndices( const int * const local_xlength, const int * const neig
                 if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_send * (local_xlength[0] + 2) + x] == FLUID || flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_send * (local_xlength[0] + 2) + x] == FREE_SLIP || flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_send * (local_xlength[0] + 2) + x] == PARALLEL_BOUNDARY)
                     for (i = 0; i < 5; i++)
                     {
-                        sendIndices[3][sendcounter] = PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_send * (local_xlength[0] + 2) + x) + VELOCITIESBOTTOMOUT[i];
+                        sendIndices[3][sendcounter] = numberOfCells * VELOCITIESBOTTOMOUT[i] + (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_send * (local_xlength[0] + 2) + x);
                         sendcounter++;
                     }
                 if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_recv * (local_xlength[0] + 2) + x] == PARALLEL_BOUNDARY || flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_recv * (local_xlength[0] + 2) + x] == FREE_SLIP )
                     for (i = 0; i < 5; i++)
                     {
-                        recvIndices[3][recvcounter] = PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_recv * (local_xlength[0] + 2) + x) + VELOCITIESTOPOUT[i];
+                        recvIndices[3][recvcounter] = numberOfCells * VELOCITIESTOPOUT[i] + (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_recv * (local_xlength[0] + 2) + x);
                         recvcounter++;
                     }
             }
@@ -632,14 +349,14 @@ void getSendRecvIndices( const int * const local_xlength, const int * const neig
                     if (flagField[z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FREE_SLIP)
                         for (i = 0; i < 5; i++)
                         {
-                            sendIndices[4][sendcounter] = PARAMQ * (z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + VELOCITIESFRONTOUT[i];
+                            sendIndices[4][sendcounter] = numberOfCells * VELOCITIESFRONTOUT[i] +  (z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x);
                             sendcounter++;
                         }
                     if (flagField[z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FREE_SLIP)
                         for (i = 0; i < 5; i++)
                         {
-                            recvIndices[4][recvcounter] = PARAMQ * (z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + VELOCITIESBACKOUT[i];
-                            sendcounter++;
+                            recvIndices[4][recvcounter] = numberOfCells * VELOCITIESBACKOUT[i] + (z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x);
+                            recvcounter++;
                         }
                 }
                 else
@@ -647,14 +364,14 @@ void getSendRecvIndices( const int * const local_xlength, const int * const neig
                     if (flagField[z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FLUID || flagField[z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == PARALLEL_BOUNDARY || flagField[z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FREE_SLIP)
                         for (i = 0; i < 5; i++)
                         {
-                            sendIndices[4][sendcounter] = PARAMQ * (z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + VELOCITIESFRONTOUT[i];
+                            sendIndices[4][sendcounter] = numberOfCells * VELOCITIESFRONTOUT[i] + (z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x);
                             sendcounter++;
                         }
                     if (flagField[z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == PARALLEL_BOUNDARY || flagField[z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FREE_SLIP)
                         for (i = 0; i < 5; i++)
                         {
-                            recvIndices[4][recvcounter] = PARAMQ * (z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + VELOCITIESBACKOUT[i];
-                            sendcounter++;
+                            recvIndices[4][recvcounter] = numberOfCells * VELOCITIESBACKOUT[i] + (z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x);
+                            recvcounter++;
                         }
                 }
     }
@@ -670,14 +387,14 @@ void getSendRecvIndices( const int * const local_xlength, const int * const neig
                     if (flagField[z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FREE_SLIP)
                         for (i = 0; i < 5; i++)
                         {
-                            sendIndices[5][sendcounter] = PARAMQ * (z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + VELOCITIESBACKOUT[i];
+                            sendIndices[5][sendcounter] = numberOfCells * VELOCITIESBACKOUT[i] + (z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x);
                             sendcounter++;
                         }
                     if (flagField[z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FREE_SLIP)
                         for (i = 0; i < 5; i++)
                         {
-                            recvIndices[5][recvcounter] = PARAMQ * (z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + VELOCITIESFRONTOUT[i];
-                            sendcounter++;
+                            recvIndices[5][recvcounter] = numberOfCells * VELOCITIESFRONTOUT[i] + (z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x);
+                            recvcounter++;
                         }
                 }
                 else
@@ -685,16 +402,32 @@ void getSendRecvIndices( const int * const local_xlength, const int * const neig
                     if (flagField[z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FLUID || flagField[z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == PARALLEL_BOUNDARY || flagField[z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FREE_SLIP)
                         for (i = 0; i < 5; i++)
                         {
-                            sendIndices[5][sendcounter] = PARAMQ * (z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + VELOCITIESBACKOUT[i];
+                            sendIndices[5][sendcounter] = numberOfCells * VELOCITIESBACKOUT[i] + (z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x);
                             sendcounter++;
                         }
                     if (flagField[z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == PARALLEL_BOUNDARY || flagField[z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FREE_SLIP)
                         for (i = 0; i < 5; i++)
                         {
-                            recvIndices[5][recvcounter] = PARAMQ * (z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + VELOCITIESFRONTOUT[i];
-                            sendcounter++;
+                            recvIndices[5][recvcounter] = numberOfCells * VELOCITIESFRONTOUT[i] + (z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x);
+                            recvcounter++;
                         }
                 }
+    }
+
+}
+
+void checkRequestCompletion( MPI_Request * MPISendReq, MPI_Request * MPIRecvReq, int axis, int * neighbours)
+{
+
+    if (neighbours[2 * axis] >= 0)
+    {
+        MPI_Wait(&MPISendReq[0], MPI_STATUS_IGNORE);
+        MPI_Wait(&MPIRecvReq[0], MPI_STATUS_IGNORE);
+    }
+    if (neighbours[2 * axis + 1] >= 0)
+    {
+        MPI_Wait(&MPISendReq[1], MPI_STATUS_IGNORE);
+        MPI_Wait(&MPIRecvReq[1], MPI_STATUS_IGNORE);
     }
 
 }
@@ -740,3 +473,4 @@ void initialiseMPITypes( const int * const local_xlength, const int * const neig
             free(recvIndices[i]);
         }
 }
+

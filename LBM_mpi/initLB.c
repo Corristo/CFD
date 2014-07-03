@@ -87,18 +87,12 @@ void initialiseFields( double *collideField, double *streamField, int *flagField
 {
     int i, j, k, x, y, z;
 
+    for (i = 0; i < PARAMQ; i++)
+        for (j = 0; j < (local_xlength[0] + 2) * (local_xlength[1] + 2) * (local_xlength[2] + 2); j++)
+            collideField[j + i * (local_xlength[0] + 2) * (local_xlength[1] + 2) * (local_xlength[2] + 2)] = streamField[j + i * (local_xlength[0] + 2) * (local_xlength[1] + 2) * (local_xlength[2] + 2)] = LATTICEWEIGHTS[i];
 
-    for (z = 0; z <= local_xlength[2] + 1; z++)
-        for (y = 0; y <= local_xlength[1] + 1; y++)
-            for (x = 0; x <= local_xlength[0] + 1; x++)
-            {
-                for (i = 0; i < PARAMQ; i++)
-                {
-                    collideField[PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + i] = LATTICEWEIGHTS[i];
-                    streamField[PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + i] = LATTICEWEIGHTS[i];
-                }
-                flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] = FLUID;
-            }
+    for (i = 0; i < (local_xlength[0] + 2) * (local_xlength[1] + 2) * (local_xlength[2] + 2); i++)
+        flagField[i] = FLUID;
 
 
     // independend of the problem first initialize all ghost cells as PARALLEL_BOUNDARY
