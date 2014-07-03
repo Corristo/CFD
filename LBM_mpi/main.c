@@ -2,7 +2,6 @@
 #define _MAIN_C_
 
 #include <mpi.h>
-#include "collision.h"
 #include "streaming.h"
 #include "initLB.h"
 #include "visualLB.h"
