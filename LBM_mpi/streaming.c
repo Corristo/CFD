@@ -1,7 +1,9 @@
 #include "streaming.h"
 #include "LBDefinitions.h"
 #include "helper.h"
+#ifdef _AVX_
 #include <immintrin.h>
+#endif // _AVX_
 #include <omp.h>
 #include <unistd.h>
 
@@ -11,6 +13,9 @@ void doStreamingAndCollision(double *collideField, double *streamField,int *flag
     double f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18;
     double density, velocity[3];
     double tmpFeq0, tmpFeq1, tmpFeq2, dotProduct;
+    #ifdef _ARBITRARYGEOMETRY_
+    int streamMask, copyMask;
+    #endif // _ARBITRARYGEOMETRY_
 
     // Philip Neumann approach
     int numberOfCells = (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
@@ -23,7 +28,11 @@ void doStreamingAndCollision(double *collideField, double *streamField,int *flag
     switch(part)
     {
     case 1:
+        #ifdef _ARBITRARYGEOMETRY__
+        #pragma omp parallel for private(copyMask, streamMask, f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, density, velocity, tmpFeq0, tmpFeq1, tmpFeq2, dotProduct, x, y, j), firstprivate(numberOfCells, tau), shared(xlength, streamField, collideField) schedule(static)
+        #else
         #pragma omp parallel for private(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, density, velocity, tmpFeq0, tmpFeq1, tmpFeq2, dotProduct, x, y, j), firstprivate(numberOfCells, tau), shared(xlength, streamField, collideField) schedule(static)
+        #endif
         for (z = 2; z <= xlength[2] / 3; z++)
         {
             j = 2 + 2 * (xlength[0] + 2) + (xlength[0] + 2) * (xlength[1] + 2) * z;
@@ -35,63 +44,111 @@ void doStreamingAndCollision(double *collideField, double *streamField,int *flag
                     if (counter != j)
                         printf("ERROR: Counters differ!\n");
                     density = velocity[0] = velocity[1] = velocity[2] = 0;
+                    #ifdef _ARBITRARYGEOMETRY_
+                    streamMask = !flagField[j];
+                    copyMask = !streamMask;
+                    #endif // _ARBITRARYGEOMETRY_
                     // load direction i = 0;
                     // c_0 = (0, -1, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)] * streamMask + copyMask * collideField[j];
+                    #else
                     f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)];
+                    #endif
                     density += f0;
                     velocity[1] -= f0;
                     velocity[2] -= f0;
 
                     // load direction i = 1;
                     // c_1 = (-1, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1] * streamMask + copyMask * collideField[j + numberOfCells];
+                    #else
                     f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1];
+                    #endif
+
                     density += f1;
                     velocity[0] -= f1;
                     velocity[2] -= f1;
 
                     // load direction i = 2;
                     // c_2 = (0, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 2];
+                    #else
                     f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)];
+                    #endif
+
                     density += f2;
                     velocity[2] -= f2;
 
                     // load direction i = 3;
                     // c_3 = (1, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1] * streamMask + copyMask * collideField[j + numberOfCells * 3];
+                    #else
                     f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1];
+                    #endif
+
                     density += f3;
                     velocity[0] += f3;
                     velocity[2] -= f3;
 
                     // load direction i = 4;
                     // c_4 = (0, 1, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 4];
+                    #else
                     f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)];
+                    #endif
+
                     density += f4;
                     velocity[1] += f4;
                     velocity[2] -= f4;
 
                     // load direction i = 5;
                     // c_5 = (-1, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f5 = collideField[5 * numberOfCells + j + xlength[0] + 3] * streamMask + copyMask * collideField[j + numberOfCells * 5];
+                    #else
                     f5 = collideField[5 * numberOfCells + j + xlength[0] + 3];
+                    #endif
+
                     density += f5;
                     velocity[0] -= f5;
                     velocity[1] -= f5;
 
                     // load direction i = 6;
                     // c_6 = (0, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f6 = collideField[6 * numberOfCells + j + xlength[0] + 2] * streamMask + copyMask * collideField[j + numberOfCells * 6];
+                    #else
                     f6 = collideField[6 * numberOfCells + j + xlength[0] + 2];
+                    #endif
+
                     density += f6;
                     velocity[1] -= f6;
 
                     // load direction i = 7;
                     // c_7 = (1, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f7 = collideField[7 * numberOfCells + j + xlength[0] + 1] * streamMask + copyMask * collideField[j + numberOfCells * 7];
+                    #else
                     f7 = collideField[7 * numberOfCells + j + xlength[0] + 1];
+                    #endif
+
                     density += f7;
                     velocity[0] += f7;
                     velocity[1] -= f7;
 
                     // load direction i = 8;
                     // c_8 = (-1, 0, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f8 = collideField[8 * numberOfCells + j + 1] * streamMask + copyMask * collideField[j + numberOfCells * 8];
+                    #else
                     f8 = collideField[8 * numberOfCells + j + 1];
+                    #endif
+
                     density += f8;
                     velocity[0] -= f8;
 
@@ -102,60 +159,105 @@ void doStreamingAndCollision(double *collideField, double *streamField,int *flag
 
                     // load direction i = 10;
                     // c_10 = (1, 0, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f10 = collideField[10 * numberOfCells + j - 1] * streamMask + copyMask * collideField[j + numberOfCells * 11];
+                    #else
                     f10 = collideField[10 * numberOfCells + j - 1];
+                    #endif
+
                     density += f10;
                     velocity[0] += f10;
 
                     // load direction i = 11;
                     // c_11 = (-1, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f11 = collideField[11 * numberOfCells + j - xlength[0] - 1] * streamMask + copyMask * collideField[j + numberOfCells * 11];
+                    #else
                     f11 = collideField[11 * numberOfCells + j - xlength[0] - 1];
+                    #endif
+
                     density += f11;
                     velocity[0] -= f11;
                     velocity[1] += f11;
 
                     // load direction i = 12;
                     // c_12 = (0, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f12 = collideField[12 * numberOfCells + j - xlength[0] - 2] * streamMask + copyMask * collideField[j + numberOfCells * 12];
+                    #else
                     f12 = collideField[12 * numberOfCells + j - xlength[0] - 2];
+                    #endif
+
                     density += f12;
                     velocity[1] += f12;
 
                     // load direction i = 13;
                     // c_13 = (1, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f13 = collideField[13 * numberOfCells + j - xlength[0] - 3] * streamMask + copyMask * collideField[j + numberOfCells * 13];
+                    #else
                     f13 = collideField[13 * numberOfCells + j - xlength[0] - 3];
+                    #endif
+
                     density += f13;
                     velocity[0] += f13;
                     velocity[1] += f13;
 
                     // load direction i = 14;
                     // c_14 = (0, -1, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)] * streamMask + copyMask * collideField[j + numberOfCells * 14];
+                    #else
                     f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)];
+                    #endif
+
                     density += f14;
                     velocity[1] -= f14;
                     velocity[2] += f14;
 
                     // load direction i = 15;
                     // c_15 = (-1, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1] * streamMask + copyMask * collideField[j + numberOfCells * 15];
+                    #else
                     f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1];
+                    #endif
+
                     density += f15;
                     velocity[0] -= f15;
                     velocity[2] += f15;
 
                     // load direction i = 16;
                     // c_16 = (0, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 16];
+                    #else
                     f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)];
+                    #endif
+
                     density += f16;
                     velocity[2] += f16;
 
                     // load direction i = 17;
                     // c_17 = (1, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1] * streamMask + copyMask * collideField[j + numberOfCells * 17];
+                    #else
                     f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1];
+                    #endif
+
                     density += f17;
                     velocity[0] += f17;
                     velocity[2] += f17;
 
                     // load direction i = 18;
                     // c_18 = (0, 1, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)] * streamMask + copyMask * collideField[j + numberOfCells * 18];
+                    #else
                     f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)];
+                    #endif
+
                     density += f18;
                     velocity[1] += f18;
                     velocity[2] += f18;
@@ -252,7 +354,11 @@ void doStreamingAndCollision(double *collideField, double *streamField,int *flag
         }
         break;
     case 2:
+        #ifdef _ARBITRARYGEOMETRY__
+        #pragma omp parallel for private(copyMask, streamMask, f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, density, velocity, tmpFeq0, tmpFeq1, tmpFeq2, dotProduct, x, y, j), firstprivate(numberOfCells, tau), shared(xlength, streamField, collideField) schedule(static)
+        #else
         #pragma omp parallel for private(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, density, velocity, tmpFeq0, tmpFeq1, tmpFeq2, dotProduct, x, y, j), firstprivate(numberOfCells, tau), shared(xlength, streamField, collideField) schedule(static)
+        #endif
         for (z = xlength[2] / 3 + 1; z <= 2 * xlength[2] / 3; z++)
         {
             j = 1 + 2 * (xlength[0] + 2) + (xlength[0] + 2) * (xlength[1] + 2) * z;
@@ -263,64 +369,113 @@ void doStreamingAndCollision(double *collideField, double *streamField,int *flag
                     int counter = x + y * (xlength[0] + 2) + z * (xlength[0] + 2) * (xlength[1] + 2);
                     if (counter != j)
                         printf("ERROR: Counters differ!\n");
-                    density = velocity[0] = velocity[1] = velocity[2] = 0;
+
+                   density = velocity[0] = velocity[1] = velocity[2] = 0;
+                    #ifdef _ARBITRARYGEOMETRY_
+                    streamMask = !flagField[j];
+                    copyMask = !streamMask;
+                    #endif // _ARBITRARYGEOMETRY_
                     // load direction i = 0;
                     // c_0 = (0, -1, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)] * streamMask + copyMask * collideField[j];
+                    #else
                     f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)];
+                    #endif
                     density += f0;
                     velocity[1] -= f0;
                     velocity[2] -= f0;
 
                     // load direction i = 1;
                     // c_1 = (-1, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1] * streamMask + copyMask * collideField[j + numberOfCells];
+                    #else
                     f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1];
+                    #endif
+
                     density += f1;
                     velocity[0] -= f1;
                     velocity[2] -= f1;
 
                     // load direction i = 2;
                     // c_2 = (0, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 2];
+                    #else
                     f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)];
+                    #endif
+
                     density += f2;
                     velocity[2] -= f2;
 
                     // load direction i = 3;
                     // c_3 = (1, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1] * streamMask + copyMask * collideField[j + numberOfCells * 3];
+                    #else
                     f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1];
+                    #endif
+
                     density += f3;
                     velocity[0] += f3;
                     velocity[2] -= f3;
 
                     // load direction i = 4;
                     // c_4 = (0, 1, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 4];
+                    #else
                     f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)];
+                    #endif
+
                     density += f4;
                     velocity[1] += f4;
                     velocity[2] -= f4;
 
                     // load direction i = 5;
                     // c_5 = (-1, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f5 = collideField[5 * numberOfCells + j + xlength[0] + 3] * streamMask + copyMask * collideField[j + numberOfCells * 5];
+                    #else
                     f5 = collideField[5 * numberOfCells + j + xlength[0] + 3];
+                    #endif
+
                     density += f5;
                     velocity[0] -= f5;
                     velocity[1] -= f5;
 
                     // load direction i = 6;
                     // c_6 = (0, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f6 = collideField[6 * numberOfCells + j + xlength[0] + 2] * streamMask + copyMask * collideField[j + numberOfCells * 6];
+                    #else
                     f6 = collideField[6 * numberOfCells + j + xlength[0] + 2];
+                    #endif
+
                     density += f6;
                     velocity[1] -= f6;
 
                     // load direction i = 7;
                     // c_7 = (1, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f7 = collideField[7 * numberOfCells + j + xlength[0] + 1] * streamMask + copyMask * collideField[j + numberOfCells * 7];
+                    #else
                     f7 = collideField[7 * numberOfCells + j + xlength[0] + 1];
+                    #endif
+
                     density += f7;
                     velocity[0] += f7;
                     velocity[1] -= f7;
 
                     // load direction i = 8;
                     // c_8 = (-1, 0, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f8 = collideField[8 * numberOfCells + j + 1] * streamMask + copyMask * collideField[j + numberOfCells * 8];
+                    #else
                     f8 = collideField[8 * numberOfCells + j + 1];
+                    #endif
+
                     density += f8;
                     velocity[0] -= f8;
 
@@ -331,60 +486,105 @@ void doStreamingAndCollision(double *collideField, double *streamField,int *flag
 
                     // load direction i = 10;
                     // c_10 = (1, 0, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f10 = collideField[10 * numberOfCells + j - 1] * streamMask + copyMask * collideField[j + numberOfCells * 11];
+                    #else
                     f10 = collideField[10 * numberOfCells + j - 1];
+                    #endif
+
                     density += f10;
                     velocity[0] += f10;
 
                     // load direction i = 11;
                     // c_11 = (-1, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f11 = collideField[11 * numberOfCells + j - xlength[0] - 1] * streamMask + copyMask * collideField[j + numberOfCells * 11];
+                    #else
                     f11 = collideField[11 * numberOfCells + j - xlength[0] - 1];
+                    #endif
+
                     density += f11;
                     velocity[0] -= f11;
                     velocity[1] += f11;
 
                     // load direction i = 12;
                     // c_12 = (0, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f12 = collideField[12 * numberOfCells + j - xlength[0] - 2] * streamMask + copyMask * collideField[j + numberOfCells * 12];
+                    #else
                     f12 = collideField[12 * numberOfCells + j - xlength[0] - 2];
+                    #endif
+
                     density += f12;
                     velocity[1] += f12;
 
                     // load direction i = 13;
                     // c_13 = (1, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f13 = collideField[13 * numberOfCells + j - xlength[0] - 3] * streamMask + copyMask * collideField[j + numberOfCells * 13];
+                    #else
                     f13 = collideField[13 * numberOfCells + j - xlength[0] - 3];
+                    #endif
+
                     density += f13;
                     velocity[0] += f13;
                     velocity[1] += f13;
 
                     // load direction i = 14;
                     // c_14 = (0, -1, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)] * streamMask + copyMask * collideField[j + numberOfCells * 14];
+                    #else
                     f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)];
+                    #endif
+
                     density += f14;
                     velocity[1] -= f14;
                     velocity[2] += f14;
 
                     // load direction i = 15;
                     // c_15 = (-1, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1] * streamMask + copyMask * collideField[j + numberOfCells * 15];
+                    #else
                     f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1];
+                    #endif
+
                     density += f15;
                     velocity[0] -= f15;
                     velocity[2] += f15;
 
                     // load direction i = 16;
                     // c_16 = (0, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 16];
+                    #else
                     f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)];
+                    #endif
+
                     density += f16;
                     velocity[2] += f16;
 
                     // load direction i = 17;
                     // c_17 = (1, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1] * streamMask + copyMask * collideField[j + numberOfCells * 17];
+                    #else
                     f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1];
+                    #endif
+
                     density += f17;
                     velocity[0] += f17;
                     velocity[2] += f17;
 
                     // load direction i = 18;
                     // c_18 = (0, 1, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)] * streamMask + copyMask * collideField[j + numberOfCells * 18];
+                    #else
                     f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)];
+                    #endif
+
                     density += f18;
                     velocity[1] += f18;
                     velocity[2] += f18;
@@ -481,7 +681,11 @@ void doStreamingAndCollision(double *collideField, double *streamField,int *flag
         }
         break;
     case 3:
+        #ifdef _ARBITRARYGEOMETRY__
+        #pragma omp parallel for private(copyMask, streamMask, f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, density, velocity, tmpFeq0, tmpFeq1, tmpFeq2, dotProduct, x, y, j), firstprivate(numberOfCells, tau), shared(xlength, streamField, collideField) schedule(static)
+        #else
         #pragma omp parallel for private(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, density, velocity, tmpFeq0, tmpFeq1, tmpFeq2, dotProduct, x, y, j), firstprivate(numberOfCells, tau), shared(xlength, streamField, collideField) schedule(static)
+        #endif
         for (z = 2 * xlength[2] / 3 + 1; z <= xlength[2] - 1; z++)
         {
             j = xlength[0] + 3 + (xlength[0] + 2) * (xlength[1] + 2) * z;
@@ -493,63 +697,111 @@ void doStreamingAndCollision(double *collideField, double *streamField,int *flag
                     if (counter != j)
                         printf("ERROR: Counters differ!\n");
                     density = velocity[0] = velocity[1] = velocity[2] = 0;
+                    #ifdef _ARBITRARYGEOMETRY_
+                    streamMask = !flagField[j];
+                    copyMask = !streamMask;
+                    #endif // _ARBITRARYGEOMETRY_
                     // load direction i = 0;
                     // c_0 = (0, -1, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)] * streamMask + copyMask * collideField[j];
+                    #else
                     f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)];
+                    #endif
                     density += f0;
                     velocity[1] -= f0;
                     velocity[2] -= f0;
 
                     // load direction i = 1;
                     // c_1 = (-1, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1] * streamMask + copyMask * collideField[j + numberOfCells];
+                    #else
                     f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1];
+                    #endif
+
                     density += f1;
                     velocity[0] -= f1;
                     velocity[2] -= f1;
 
                     // load direction i = 2;
                     // c_2 = (0, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 2];
+                    #else
                     f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)];
+                    #endif
+
                     density += f2;
                     velocity[2] -= f2;
 
                     // load direction i = 3;
                     // c_3 = (1, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1] * streamMask + copyMask * collideField[j + numberOfCells * 3];
+                    #else
                     f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1];
+                    #endif
+
                     density += f3;
                     velocity[0] += f3;
                     velocity[2] -= f3;
 
                     // load direction i = 4;
                     // c_4 = (0, 1, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 4];
+                    #else
                     f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)];
+                    #endif
+
                     density += f4;
                     velocity[1] += f4;
                     velocity[2] -= f4;
 
                     // load direction i = 5;
                     // c_5 = (-1, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f5 = collideField[5 * numberOfCells + j + xlength[0] + 3] * streamMask + copyMask * collideField[j + numberOfCells * 5];
+                    #else
                     f5 = collideField[5 * numberOfCells + j + xlength[0] + 3];
+                    #endif
+
                     density += f5;
                     velocity[0] -= f5;
                     velocity[1] -= f5;
 
                     // load direction i = 6;
                     // c_6 = (0, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f6 = collideField[6 * numberOfCells + j + xlength[0] + 2] * streamMask + copyMask * collideField[j + numberOfCells * 6];
+                    #else
                     f6 = collideField[6 * numberOfCells + j + xlength[0] + 2];
+                    #endif
+
                     density += f6;
                     velocity[1] -= f6;
 
                     // load direction i = 7;
                     // c_7 = (1, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f7 = collideField[7 * numberOfCells + j + xlength[0] + 1] * streamMask + copyMask * collideField[j + numberOfCells * 7];
+                    #else
                     f7 = collideField[7 * numberOfCells + j + xlength[0] + 1];
+                    #endif
+
                     density += f7;
                     velocity[0] += f7;
                     velocity[1] -= f7;
 
                     // load direction i = 8;
                     // c_8 = (-1, 0, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f8 = collideField[8 * numberOfCells + j + 1] * streamMask + copyMask * collideField[j + numberOfCells * 8];
+                    #else
                     f8 = collideField[8 * numberOfCells + j + 1];
+                    #endif
+
                     density += f8;
                     velocity[0] -= f8;
 
@@ -560,60 +812,105 @@ void doStreamingAndCollision(double *collideField, double *streamField,int *flag
 
                     // load direction i = 10;
                     // c_10 = (1, 0, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f10 = collideField[10 * numberOfCells + j - 1] * streamMask + copyMask * collideField[j + numberOfCells * 11];
+                    #else
                     f10 = collideField[10 * numberOfCells + j - 1];
+                    #endif
+
                     density += f10;
                     velocity[0] += f10;
 
                     // load direction i = 11;
                     // c_11 = (-1, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f11 = collideField[11 * numberOfCells + j - xlength[0] - 1] * streamMask + copyMask * collideField[j + numberOfCells * 11];
+                    #else
                     f11 = collideField[11 * numberOfCells + j - xlength[0] - 1];
+                    #endif
+
                     density += f11;
                     velocity[0] -= f11;
                     velocity[1] += f11;
 
                     // load direction i = 12;
                     // c_12 = (0, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f12 = collideField[12 * numberOfCells + j - xlength[0] - 2] * streamMask + copyMask * collideField[j + numberOfCells * 12];
+                    #else
                     f12 = collideField[12 * numberOfCells + j - xlength[0] - 2];
+                    #endif
+
                     density += f12;
                     velocity[1] += f12;
 
                     // load direction i = 13;
                     // c_13 = (1, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f13 = collideField[13 * numberOfCells + j - xlength[0] - 3] * streamMask + copyMask * collideField[j + numberOfCells * 13];
+                    #else
                     f13 = collideField[13 * numberOfCells + j - xlength[0] - 3];
+                    #endif
+
                     density += f13;
                     velocity[0] += f13;
                     velocity[1] += f13;
 
                     // load direction i = 14;
                     // c_14 = (0, -1, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)] * streamMask + copyMask * collideField[j + numberOfCells * 14];
+                    #else
                     f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)];
+                    #endif
+
                     density += f14;
                     velocity[1] -= f14;
                     velocity[2] += f14;
 
                     // load direction i = 15;
                     // c_15 = (-1, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1] * streamMask + copyMask * collideField[j + numberOfCells * 15];
+                    #else
                     f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1];
+                    #endif
+
                     density += f15;
                     velocity[0] -= f15;
                     velocity[2] += f15;
 
                     // load direction i = 16;
                     // c_16 = (0, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 16];
+                    #else
                     f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)];
+                    #endif
+
                     density += f16;
                     velocity[2] += f16;
 
                     // load direction i = 17;
                     // c_17 = (1, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1] * streamMask + copyMask * collideField[j + numberOfCells * 17];
+                    #else
                     f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1];
+                    #endif
+
                     density += f17;
                     velocity[0] += f17;
                     velocity[2] += f17;
 
                     // load direction i = 18;
                     // c_18 = (0, 1, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)] * streamMask + copyMask * collideField[j + numberOfCells * 18];
+                    #else
                     f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)];
+                    #endif
+
                     density += f18;
                     velocity[1] += f18;
                     velocity[2] += f18;
@@ -710,8 +1007,12 @@ void doStreamingAndCollision(double *collideField, double *streamField,int *flag
         }
         break;
     case 4:
-        #pragma omp parallel private(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, density, velocity, tmpFeq0, tmpFeq1, tmpFeq2, dotProduct, x, y, z, j), firstprivate(numberOfCells, tau), shared(xlength, streamField, collideField)
-    {
+        #ifdef _ARBITRARYGEOMETRY__
+        #pragma omp parallel private(copyMask, streamMask, f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, density, velocity, tmpFeq0, tmpFeq1, tmpFeq2, dotProduct, x, y, j), firstprivate(numberOfCells, tau), shared(xlength, streamField, collideField)
+        #else
+        #pragma omp parallel private(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, density, velocity, tmpFeq0, tmpFeq1, tmpFeq2, dotProduct, x, y, j), firstprivate(numberOfCells, tau), shared(xlength, streamField, collideField)
+        #endif
+        {
         /** z = 1 */
         #pragma omp for schedule(static)
         for (y = 1; y <= xlength[1]; y++)
@@ -720,132 +1021,223 @@ void doStreamingAndCollision(double *collideField, double *streamField,int *flag
             for (x = 1; x <= xlength[0]; x++)
             {
                 density = velocity[0] = velocity[1] = velocity[2] = 0;
+                    #ifdef _ARBITRARYGEOMETRY_
+                    streamMask = !flagField[j];
+                    copyMask = !streamMask;
+                    #endif // _ARBITRARYGEOMETRY_
+                    // load direction i = 0;
+                    // c_0 = (0, -1, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)] * streamMask + copyMask * collideField[j];
+                    #else
+                    f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)];
+                    #endif
+                    density += f0;
+                    velocity[1] -= f0;
+                    velocity[2] -= f0;
 
-                // load direction i = 0;
-                // c_0 = (0, -1, -1)
-                f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)];
-                density += f0;
-                velocity[1] -= f0;
-                velocity[2] -= f0;
+                    // load direction i = 1;
+                    // c_1 = (-1, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1] * streamMask + copyMask * collideField[j + numberOfCells];
+                    #else
+                    f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1];
+                    #endif
 
-                // load direction i = 1;
-                // c_1 = (-1, 0, -1)
-                f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1];
-                density += f1;
-                velocity[0] -= f1;
-                velocity[2] -= f1;
+                    density += f1;
+                    velocity[0] -= f1;
+                    velocity[2] -= f1;
 
-                // load direction i = 2;
-                // c_2 = (0, 0, -1)
-                f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)];
-                density += f2;
-                velocity[2] -= f2;
+                    // load direction i = 2;
+                    // c_2 = (0, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 2];
+                    #else
+                    f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)];
+                    #endif
 
-                // load direction i = 3;
-                // c_3 = (1, 0, -1)
-                f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1];
-                density += f3;
-                velocity[0] += f3;
-                velocity[2] -= f3;
+                    density += f2;
+                    velocity[2] -= f2;
 
-                // load direction i = 4;
-                // c_4 = (0, 1, -1)
-                f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)];
-                density += f4;
-                velocity[1] += f4;
-                velocity[2] -= f4;
+                    // load direction i = 3;
+                    // c_3 = (1, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1] * streamMask + copyMask * collideField[j + numberOfCells * 3];
+                    #else
+                    f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1];
+                    #endif
 
-                // load direction i = 5;
-                // c_5 = (-1, -1, 0)
-                f5 = collideField[5 * numberOfCells + j + xlength[0] + 3];
-                density += f5;
-                velocity[0] -= f5;
-                velocity[1] -= f5;
+                    density += f3;
+                    velocity[0] += f3;
+                    velocity[2] -= f3;
 
-                // load direction i = 6;
-                // c_6 = (0, -1, 0)
-                f6 = collideField[6 * numberOfCells + j + xlength[0] + 2];
-                density += f6;
-                velocity[1] -= f6;
+                    // load direction i = 4;
+                    // c_4 = (0, 1, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 4];
+                    #else
+                    f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)];
+                    #endif
 
-                // load direction i = 7;
-                // c_7 = (1, -1, 0)
-                f7 = collideField[7 * numberOfCells + j + xlength[0] + 1];
-                density += f7;
-                velocity[0] += f7;
-                velocity[1] -= f7;
+                    density += f4;
+                    velocity[1] += f4;
+                    velocity[2] -= f4;
 
-                // load direction i = 8;
-                // c_8 = (-1, 0, 0)
-                f8 = collideField[8 * numberOfCells + j + 1];
-                density += f8;
-                velocity[0] -= f8;
+                    // load direction i = 5;
+                    // c_5 = (-1, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f5 = collideField[5 * numberOfCells + j + xlength[0] + 3] * streamMask + copyMask * collideField[j + numberOfCells * 5];
+                    #else
+                    f5 = collideField[5 * numberOfCells + j + xlength[0] + 3];
+                    #endif
 
-                // load direction i = 9;
-                // c_9 = (0, 0, 0)
-                f9 = collideField[9 * numberOfCells + j];
-                density += f9;
+                    density += f5;
+                    velocity[0] -= f5;
+                    velocity[1] -= f5;
 
-                // load direction i = 10;
-                // c_10 = (1, 0, 0)
-                f10 = collideField[10 * numberOfCells + j - 1];
-                density += f10;
-                velocity[0] += f10;
+                    // load direction i = 6;
+                    // c_6 = (0, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f6 = collideField[6 * numberOfCells + j + xlength[0] + 2] * streamMask + copyMask * collideField[j + numberOfCells * 6];
+                    #else
+                    f6 = collideField[6 * numberOfCells + j + xlength[0] + 2];
+                    #endif
 
-                // load direction i = 11;
-                // c_11 = (-1, 1, 0)
-                f11 = collideField[11 * numberOfCells + j - xlength[0] - 1];
-                density += f11;
-                velocity[0] -= f11;
-                velocity[1] += f11;
+                    density += f6;
+                    velocity[1] -= f6;
 
-                // load direction i = 12;
-                // c_12 = (0, 1, 0)
-                f12 = collideField[12 * numberOfCells + j - xlength[0] - 2];
-                density += f12;
-                velocity[1] += f12;
+                    // load direction i = 7;
+                    // c_7 = (1, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f7 = collideField[7 * numberOfCells + j + xlength[0] + 1] * streamMask + copyMask * collideField[j + numberOfCells * 7];
+                    #else
+                    f7 = collideField[7 * numberOfCells + j + xlength[0] + 1];
+                    #endif
 
-                // load direction i = 13;
-                // c_13 = (1, 1, 0)
-                f13 = collideField[13 * numberOfCells + j - xlength[0] - 3];
-                density += f13;
-                velocity[0] += f13;
-                velocity[1] += f13;
+                    density += f7;
+                    velocity[0] += f7;
+                    velocity[1] -= f7;
 
-                // load direction i = 14;
-                // c_14 = (0, -1, 1)
-                f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)];
-                density += f14;
-                velocity[1] -= f14;
-                velocity[2] += f14;
+                    // load direction i = 8;
+                    // c_8 = (-1, 0, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f8 = collideField[8 * numberOfCells + j + 1] * streamMask + copyMask * collideField[j + numberOfCells * 8];
+                    #else
+                    f8 = collideField[8 * numberOfCells + j + 1];
+                    #endif
 
-                // load direction i = 15;
-                // c_15 = (-1, 0, 1)
-                f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1];
-                density += f15;
-                velocity[0] -= f15;
-                velocity[2] += f15;
+                    density += f8;
+                    velocity[0] -= f8;
 
-                // load direction i = 16;
-                // c_16 = (0, 0, 1)
-                f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)];
-                density += f16;
-                velocity[2] += f16;
+                    // load direction i = 9;
+                    // c_9 = (0, 0, 0)
+                    f9 = collideField[9 * numberOfCells + j];
+                    density += f9;
 
-                // load direction i = 17;
-                // c_17 = (1, 0, 1)
-                f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1];
-                density += f17;
-                velocity[0] += f17;
-                velocity[2] += f17;
+                    // load direction i = 10;
+                    // c_10 = (1, 0, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f10 = collideField[10 * numberOfCells + j - 1] * streamMask + copyMask * collideField[j + numberOfCells * 11];
+                    #else
+                    f10 = collideField[10 * numberOfCells + j - 1];
+                    #endif
 
-                // load direction i = 18;
-                // c_18 = (0, 1, 1)
-                f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)];
-                density += f18;
-                velocity[1] += f18;
-                velocity[2] += f18;
+                    density += f10;
+                    velocity[0] += f10;
 
+                    // load direction i = 11;
+                    // c_11 = (-1, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f11 = collideField[11 * numberOfCells + j - xlength[0] - 1] * streamMask + copyMask * collideField[j + numberOfCells * 11];
+                    #else
+                    f11 = collideField[11 * numberOfCells + j - xlength[0] - 1];
+                    #endif
+
+                    density += f11;
+                    velocity[0] -= f11;
+                    velocity[1] += f11;
+
+                    // load direction i = 12;
+                    // c_12 = (0, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f12 = collideField[12 * numberOfCells + j - xlength[0] - 2] * streamMask + copyMask * collideField[j + numberOfCells * 12];
+                    #else
+                    f12 = collideField[12 * numberOfCells + j - xlength[0] - 2];
+                    #endif
+
+                    density += f12;
+                    velocity[1] += f12;
+
+                    // load direction i = 13;
+                    // c_13 = (1, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f13 = collideField[13 * numberOfCells + j - xlength[0] - 3] * streamMask + copyMask * collideField[j + numberOfCells * 13];
+                    #else
+                    f13 = collideField[13 * numberOfCells + j - xlength[0] - 3];
+                    #endif
+
+                    density += f13;
+                    velocity[0] += f13;
+                    velocity[1] += f13;
+
+                    // load direction i = 14;
+                    // c_14 = (0, -1, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)] * streamMask + copyMask * collideField[j + numberOfCells * 14];
+                    #else
+                    f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)];
+                    #endif
+
+                    density += f14;
+                    velocity[1] -= f14;
+                    velocity[2] += f14;
+
+                    // load direction i = 15;
+                    // c_15 = (-1, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1] * streamMask + copyMask * collideField[j + numberOfCells * 15];
+                    #else
+                    f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1];
+                    #endif
+
+                    density += f15;
+                    velocity[0] -= f15;
+                    velocity[2] += f15;
+
+                    // load direction i = 16;
+                    // c_16 = (0, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 16];
+                    #else
+                    f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)];
+                    #endif
+
+                    density += f16;
+                    velocity[2] += f16;
+
+                    // load direction i = 17;
+                    // c_17 = (1, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1] * streamMask + copyMask * collideField[j + numberOfCells * 17];
+                    #else
+                    f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1];
+                    #endif
+
+                    density += f17;
+                    velocity[0] += f17;
+                    velocity[2] += f17;
+
+                    // load direction i = 18;
+                    // c_18 = (0, 1, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)] * streamMask + copyMask * collideField[j + numberOfCells * 18];
+                    #else
+                    f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)];
+                    #endif
+
+                    density += f18;
+                    velocity[1] += f18;
+                    velocity[2] += f18;
                 velocity[0] = velocity[0] / density;
                 velocity[1] = velocity[1] / density;
                 velocity[2] = velocity[2] / density;
@@ -944,131 +1336,223 @@ void doStreamingAndCollision(double *collideField, double *streamField,int *flag
             for (x = 1; x <= xlength[0]; x++)
             {
                 density = velocity[0] = velocity[1] = velocity[2] = 0;
+                    #ifdef _ARBITRARYGEOMETRY_
+                    streamMask = !flagField[j];
+                    copyMask = !streamMask;
+                    #endif // _ARBITRARYGEOMETRY_
+                    // load direction i = 0;
+                    // c_0 = (0, -1, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)] * streamMask + copyMask * collideField[j];
+                    #else
+                    f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)];
+                    #endif
+                    density += f0;
+                    velocity[1] -= f0;
+                    velocity[2] -= f0;
 
-                // load direction i = 0;
-                // c_0 = (0, -1, -1)
-                f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)];
-                density += f0;
-                velocity[1] -= f0;
-                velocity[2] -= f0;
+                    // load direction i = 1;
+                    // c_1 = (-1, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1] * streamMask + copyMask * collideField[j + numberOfCells];
+                    #else
+                    f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1];
+                    #endif
 
-                // load direction i = 1;
-                // c_1 = (-1, 0, -1)
-                f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1];
-                density += f1;
-                velocity[0] -= f1;
-                velocity[2] -= f1;
+                    density += f1;
+                    velocity[0] -= f1;
+                    velocity[2] -= f1;
 
-                // load direction i = 2;
-                // c_2 = (0, 0, -1)
-                f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)];
-                density += f2;
-                velocity[2] -= f2;
+                    // load direction i = 2;
+                    // c_2 = (0, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 2];
+                    #else
+                    f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)];
+                    #endif
 
-                // load direction i = 3;
-                // c_3 = (1, 0, -1)
-                f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1];
-                density += f3;
-                velocity[0] += f3;
-                velocity[2] -= f3;
+                    density += f2;
+                    velocity[2] -= f2;
 
-                // load direction i = 4;
-                // c_4 = (0, 1, -1)
-                f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)];
-                density += f4;
-                velocity[1] += f4;
-                velocity[2] -= f4;
+                    // load direction i = 3;
+                    // c_3 = (1, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1] * streamMask + copyMask * collideField[j + numberOfCells * 3];
+                    #else
+                    f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1];
+                    #endif
 
-                // load direction i = 5;
-                // c_5 = (-1, -1, 0)
-                f5 = collideField[5 * numberOfCells + j + xlength[0] + 3];
-                density += f5;
-                velocity[0] -= f5;
-                velocity[1] -= f5;
+                    density += f3;
+                    velocity[0] += f3;
+                    velocity[2] -= f3;
 
-                // load direction i = 6;
-                // c_6 = (0, -1, 0)
-                f6 = collideField[6 * numberOfCells + j + xlength[0] + 2];
-                density += f6;
-                velocity[1] -= f6;
+                    // load direction i = 4;
+                    // c_4 = (0, 1, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 4];
+                    #else
+                    f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)];
+                    #endif
 
-                // load direction i = 7;
-                // c_7 = (1, -1, 0)
-                f7 = collideField[7 * numberOfCells + j + xlength[0] + 1];
-                density += f7;
-                velocity[0] += f7;
-                velocity[1] -= f7;
+                    density += f4;
+                    velocity[1] += f4;
+                    velocity[2] -= f4;
 
-                // load direction i = 8;
-                // c_8 = (-1, 0, 0)
-                f8 = collideField[8 * numberOfCells + j + 1];
-                density += f8;
-                velocity[0] -= f8;
+                    // load direction i = 5;
+                    // c_5 = (-1, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f5 = collideField[5 * numberOfCells + j + xlength[0] + 3] * streamMask + copyMask * collideField[j + numberOfCells * 5];
+                    #else
+                    f5 = collideField[5 * numberOfCells + j + xlength[0] + 3];
+                    #endif
 
-                // load direction i = 9;
-                // c_9 = (0, 0, 0)
-                f9 = collideField[9 * numberOfCells + j];
-                density += f9;
+                    density += f5;
+                    velocity[0] -= f5;
+                    velocity[1] -= f5;
 
-                // load direction i = 10;
-                // c_10 = (1, 0, 0)
-                f10 = collideField[10 * numberOfCells + j - 1];
-                density += f10;
-                velocity[0] += f10;
+                    // load direction i = 6;
+                    // c_6 = (0, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f6 = collideField[6 * numberOfCells + j + xlength[0] + 2] * streamMask + copyMask * collideField[j + numberOfCells * 6];
+                    #else
+                    f6 = collideField[6 * numberOfCells + j + xlength[0] + 2];
+                    #endif
 
-                // load direction i = 11;
-                // c_11 = (-1, 1, 0)
-                f11 = collideField[11 * numberOfCells + j - xlength[0] - 1];
-                density += f11;
-                velocity[0] -= f11;
-                velocity[1] += f11;
+                    density += f6;
+                    velocity[1] -= f6;
 
-                // load direction i = 12;
-                // c_12 = (0, 1, 0)
-                f12 = collideField[12 * numberOfCells + j - xlength[0] - 2];
-                density += f12;
-                velocity[1] += f12;
+                    // load direction i = 7;
+                    // c_7 = (1, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f7 = collideField[7 * numberOfCells + j + xlength[0] + 1] * streamMask + copyMask * collideField[j + numberOfCells * 7];
+                    #else
+                    f7 = collideField[7 * numberOfCells + j + xlength[0] + 1];
+                    #endif
 
-                // load direction i = 13;
-                // c_13 = (1, 1, 0)
-                f13 = collideField[13 * numberOfCells + j - xlength[0] - 3];
-                density += f13;
-                velocity[0] += f13;
-                velocity[1] += f13;
+                    density += f7;
+                    velocity[0] += f7;
+                    velocity[1] -= f7;
 
-                // load direction i = 14;
-                // c_14 = (0, -1, 1)
-                f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)];
-                density += f14;
-                velocity[1] -= f14;
-                velocity[2] += f14;
+                    // load direction i = 8;
+                    // c_8 = (-1, 0, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f8 = collideField[8 * numberOfCells + j + 1] * streamMask + copyMask * collideField[j + numberOfCells * 8];
+                    #else
+                    f8 = collideField[8 * numberOfCells + j + 1];
+                    #endif
 
-                // load direction i = 15;
-                // c_15 = (-1, 0, 1)
-                f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1];
-                density += f15;
-                velocity[0] -= f15;
-                velocity[2] += f15;
+                    density += f8;
+                    velocity[0] -= f8;
 
-                // load direction i = 16;
-                // c_16 = (0, 0, 1)
-                f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)];
-                density += f16;
-                velocity[2] += f16;
+                    // load direction i = 9;
+                    // c_9 = (0, 0, 0)
+                    f9 = collideField[9 * numberOfCells + j];
+                    density += f9;
 
-                // load direction i = 17;
-                // c_17 = (1, 0, 1)
-                f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1];
-                density += f17;
-                velocity[0] += f17;
-                velocity[2] += f17;
+                    // load direction i = 10;
+                    // c_10 = (1, 0, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f10 = collideField[10 * numberOfCells + j - 1] * streamMask + copyMask * collideField[j + numberOfCells * 11];
+                    #else
+                    f10 = collideField[10 * numberOfCells + j - 1];
+                    #endif
 
-                // load direction i = 18;
-                // c_18 = (0, 1, 1)
-                f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)];
-                density += f18;
-                velocity[1] += f18;
-                velocity[2] += f18;
+                    density += f10;
+                    velocity[0] += f10;
+
+                    // load direction i = 11;
+                    // c_11 = (-1, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f11 = collideField[11 * numberOfCells + j - xlength[0] - 1] * streamMask + copyMask * collideField[j + numberOfCells * 11];
+                    #else
+                    f11 = collideField[11 * numberOfCells + j - xlength[0] - 1];
+                    #endif
+
+                    density += f11;
+                    velocity[0] -= f11;
+                    velocity[1] += f11;
+
+                    // load direction i = 12;
+                    // c_12 = (0, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f12 = collideField[12 * numberOfCells + j - xlength[0] - 2] * streamMask + copyMask * collideField[j + numberOfCells * 12];
+                    #else
+                    f12 = collideField[12 * numberOfCells + j - xlength[0] - 2];
+                    #endif
+
+                    density += f12;
+                    velocity[1] += f12;
+
+                    // load direction i = 13;
+                    // c_13 = (1, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f13 = collideField[13 * numberOfCells + j - xlength[0] - 3] * streamMask + copyMask * collideField[j + numberOfCells * 13];
+                    #else
+                    f13 = collideField[13 * numberOfCells + j - xlength[0] - 3];
+                    #endif
+
+                    density += f13;
+                    velocity[0] += f13;
+                    velocity[1] += f13;
+
+                    // load direction i = 14;
+                    // c_14 = (0, -1, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)] * streamMask + copyMask * collideField[j + numberOfCells * 14];
+                    #else
+                    f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)];
+                    #endif
+
+                    density += f14;
+                    velocity[1] -= f14;
+                    velocity[2] += f14;
+
+                    // load direction i = 15;
+                    // c_15 = (-1, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1] * streamMask + copyMask * collideField[j + numberOfCells * 15];
+                    #else
+                    f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1];
+                    #endif
+
+                    density += f15;
+                    velocity[0] -= f15;
+                    velocity[2] += f15;
+
+                    // load direction i = 16;
+                    // c_16 = (0, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 16];
+                    #else
+                    f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)];
+                    #endif
+
+                    density += f16;
+                    velocity[2] += f16;
+
+                    // load direction i = 17;
+                    // c_17 = (1, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1] * streamMask + copyMask * collideField[j + numberOfCells * 17];
+                    #else
+                    f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1];
+                    #endif
+
+                    density += f17;
+                    velocity[0] += f17;
+                    velocity[2] += f17;
+
+                    // load direction i = 18;
+                    // c_18 = (0, 1, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)] * streamMask + copyMask * collideField[j + numberOfCells * 18];
+                    #else
+                    f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)];
+                    #endif
+
+                    density += f18;
+                    velocity[1] += f18;
+                    velocity[2] += f18;
 
                 velocity[0] = velocity[0] / density;
                 velocity[1] = velocity[1] / density;
@@ -1165,131 +1649,223 @@ void doStreamingAndCollision(double *collideField, double *streamField,int *flag
                 if (counter != j)
                     printf("ERROR: Counters differ!\n");
                 density = velocity[0] = velocity[1] = velocity[2] = 0;
-                // load direction i = 0;
-                // c_0 = (0, -1, -1)
-                f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)];
-                density += f0;
-                velocity[1] -= f0;
-                velocity[2] -= f0;
+                    #ifdef _ARBITRARYGEOMETRY_
+                    streamMask = !flagField[j];
+                    copyMask = !streamMask;
+                    #endif // _ARBITRARYGEOMETRY_
+                    // load direction i = 0;
+                    // c_0 = (0, -1, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)] * streamMask + copyMask * collideField[j];
+                    #else
+                    f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)];
+                    #endif
+                    density += f0;
+                    velocity[1] -= f0;
+                    velocity[2] -= f0;
 
-                // load direction i = 1;
-                // c_1 = (-1, 0, -1)
-                f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1];
-                density += f1;
-                velocity[0] -= f1;
-                velocity[2] -= f1;
+                    // load direction i = 1;
+                    // c_1 = (-1, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1] * streamMask + copyMask * collideField[j + numberOfCells];
+                    #else
+                    f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1];
+                    #endif
 
-                // load direction i = 2;
-                // c_2 = (0, 0, -1)
-                f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)];
-                density += f2;
-                velocity[2] -= f2;
+                    density += f1;
+                    velocity[0] -= f1;
+                    velocity[2] -= f1;
 
-                // load direction i = 3;
-                // c_3 = (1, 0, -1)
-                f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1];
-                density += f3;
-                velocity[0] += f3;
-                velocity[2] -= f3;
+                    // load direction i = 2;
+                    // c_2 = (0, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 2];
+                    #else
+                    f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)];
+                    #endif
 
-                // load direction i = 4;
-                // c_4 = (0, 1, -1)
-                f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)];
-                density += f4;
-                velocity[1] += f4;
-                velocity[2] -= f4;
+                    density += f2;
+                    velocity[2] -= f2;
 
-                // load direction i = 5;
-                // c_5 = (-1, -1, 0)
-                f5 = collideField[5 * numberOfCells + j + xlength[0] + 3];
-                density += f5;
-                velocity[0] -= f5;
-                velocity[1] -= f5;
+                    // load direction i = 3;
+                    // c_3 = (1, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1] * streamMask + copyMask * collideField[j + numberOfCells * 3];
+                    #else
+                    f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1];
+                    #endif
 
-                // load direction i = 6;
-                // c_6 = (0, -1, 0)
-                f6 = collideField[6 * numberOfCells + j + xlength[0] + 2];
-                density += f6;
-                velocity[1] -= f6;
+                    density += f3;
+                    velocity[0] += f3;
+                    velocity[2] -= f3;
 
-                // load direction i = 7;
-                // c_7 = (1, -1, 0)
-                f7 = collideField[7 * numberOfCells + j + xlength[0] + 1];
-                density += f7;
-                velocity[0] += f7;
-                velocity[1] -= f7;
+                    // load direction i = 4;
+                    // c_4 = (0, 1, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 4];
+                    #else
+                    f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)];
+                    #endif
 
-                // load direction i = 8;
-                // c_8 = (-1, 0, 0)
-                f8 = collideField[8 * numberOfCells + j + 1];
-                density += f8;
-                velocity[0] -= f8;
+                    density += f4;
+                    velocity[1] += f4;
+                    velocity[2] -= f4;
 
-                // load direction i = 9;
-                // c_9 = (0, 0, 0)
-                f9 = collideField[9 * numberOfCells + j];
-                density += f9;
+                    // load direction i = 5;
+                    // c_5 = (-1, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f5 = collideField[5 * numberOfCells + j + xlength[0] + 3] * streamMask + copyMask * collideField[j + numberOfCells * 5];
+                    #else
+                    f5 = collideField[5 * numberOfCells + j + xlength[0] + 3];
+                    #endif
 
-                // load direction i = 10;
-                // c_10 = (1, 0, 0)
-                f10 = collideField[10 * numberOfCells + j - 1];
-                density += f10;
-                velocity[0] += f10;
+                    density += f5;
+                    velocity[0] -= f5;
+                    velocity[1] -= f5;
 
-                // load direction i = 11;
-                // c_11 = (-1, 1, 0)
-                f11 = collideField[11 * numberOfCells + j - xlength[0] - 1];
-                density += f11;
-                velocity[0] -= f11;
-                velocity[1] += f11;
+                    // load direction i = 6;
+                    // c_6 = (0, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f6 = collideField[6 * numberOfCells + j + xlength[0] + 2] * streamMask + copyMask * collideField[j + numberOfCells * 6];
+                    #else
+                    f6 = collideField[6 * numberOfCells + j + xlength[0] + 2];
+                    #endif
 
-                // load direction i = 12;
-                // c_12 = (0, 1, 0)
-                f12 = collideField[12 * numberOfCells + j - xlength[0] - 2];
-                density += f12;
-                velocity[1] += f12;
+                    density += f6;
+                    velocity[1] -= f6;
 
-                // load direction i = 13;
-                // c_13 = (1, 1, 0)
-                f13 = collideField[13 * numberOfCells + j - xlength[0] - 3];
-                density += f13;
-                velocity[0] += f13;
-                velocity[1] += f13;
+                    // load direction i = 7;
+                    // c_7 = (1, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f7 = collideField[7 * numberOfCells + j + xlength[0] + 1] * streamMask + copyMask * collideField[j + numberOfCells * 7];
+                    #else
+                    f7 = collideField[7 * numberOfCells + j + xlength[0] + 1];
+                    #endif
 
-                // load direction i = 14;
-                // c_14 = (0, -1, 1)
-                f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)];
-                density += f14;
-                velocity[1] -= f14;
-                velocity[2] += f14;
+                    density += f7;
+                    velocity[0] += f7;
+                    velocity[1] -= f7;
 
-                // load direction i = 15;
-                // c_15 = (-1, 0, 1)
-                f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1];
-                density += f15;
-                velocity[0] -= f15;
-                velocity[2] += f15;
+                    // load direction i = 8;
+                    // c_8 = (-1, 0, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f8 = collideField[8 * numberOfCells + j + 1] * streamMask + copyMask * collideField[j + numberOfCells * 8];
+                    #else
+                    f8 = collideField[8 * numberOfCells + j + 1];
+                    #endif
 
-                // load direction i = 16;
-                // c_16 = (0, 0, 1)
-                f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)];
-                density += f16;
-                velocity[2] += f16;
+                    density += f8;
+                    velocity[0] -= f8;
 
-                // load direction i = 17;
-                // c_17 = (1, 0, 1)
-                f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1];
-                density += f17;
-                velocity[0] += f17;
-                velocity[2] += f17;
+                    // load direction i = 9;
+                    // c_9 = (0, 0, 0)
+                    f9 = collideField[9 * numberOfCells + j];
+                    density += f9;
 
-                // load direction i = 18;
-                // c_18 = (0, 1, 1)
-                f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)];
-                density += f18;
-                velocity[1] += f18;
-                velocity[2] += f18;
+                    // load direction i = 10;
+                    // c_10 = (1, 0, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f10 = collideField[10 * numberOfCells + j - 1] * streamMask + copyMask * collideField[j + numberOfCells * 11];
+                    #else
+                    f10 = collideField[10 * numberOfCells + j - 1];
+                    #endif
 
+                    density += f10;
+                    velocity[0] += f10;
+
+                    // load direction i = 11;
+                    // c_11 = (-1, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f11 = collideField[11 * numberOfCells + j - xlength[0] - 1] * streamMask + copyMask * collideField[j + numberOfCells * 11];
+                    #else
+                    f11 = collideField[11 * numberOfCells + j - xlength[0] - 1];
+                    #endif
+
+                    density += f11;
+                    velocity[0] -= f11;
+                    velocity[1] += f11;
+
+                    // load direction i = 12;
+                    // c_12 = (0, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f12 = collideField[12 * numberOfCells + j - xlength[0] - 2] * streamMask + copyMask * collideField[j + numberOfCells * 12];
+                    #else
+                    f12 = collideField[12 * numberOfCells + j - xlength[0] - 2];
+                    #endif
+
+                    density += f12;
+                    velocity[1] += f12;
+
+                    // load direction i = 13;
+                    // c_13 = (1, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f13 = collideField[13 * numberOfCells + j - xlength[0] - 3] * streamMask + copyMask * collideField[j + numberOfCells * 13];
+                    #else
+                    f13 = collideField[13 * numberOfCells + j - xlength[0] - 3];
+                    #endif
+
+                    density += f13;
+                    velocity[0] += f13;
+                    velocity[1] += f13;
+
+                    // load direction i = 14;
+                    // c_14 = (0, -1, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)] * streamMask + copyMask * collideField[j + numberOfCells * 14];
+                    #else
+                    f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)];
+                    #endif
+
+                    density += f14;
+                    velocity[1] -= f14;
+                    velocity[2] += f14;
+
+                    // load direction i = 15;
+                    // c_15 = (-1, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1] * streamMask + copyMask * collideField[j + numberOfCells * 15];
+                    #else
+                    f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1];
+                    #endif
+
+                    density += f15;
+                    velocity[0] -= f15;
+                    velocity[2] += f15;
+
+                    // load direction i = 16;
+                    // c_16 = (0, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 16];
+                    #else
+                    f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)];
+                    #endif
+
+                    density += f16;
+                    velocity[2] += f16;
+
+                    // load direction i = 17;
+                    // c_17 = (1, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1] * streamMask + copyMask * collideField[j + numberOfCells * 17];
+                    #else
+                    f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1];
+                    #endif
+
+                    density += f17;
+                    velocity[0] += f17;
+                    velocity[2] += f17;
+
+                    // load direction i = 18;
+                    // c_18 = (0, 1, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)] * streamMask + copyMask * collideField[j + numberOfCells * 18];
+                    #else
+                    f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)];
+                    #endif
+
+                    density += f18;
+                    velocity[1] += f18;
+                    velocity[2] += f18;
                 velocity[0] = velocity[0] / density;
                 velocity[1] = velocity[1] / density;
                 velocity[2] = velocity[2] / density;
@@ -1380,130 +1956,223 @@ void doStreamingAndCollision(double *collideField, double *streamField,int *flag
                 if (counter != j)
                     printf("ERROR: Counters differ!\n");
                 density = velocity[0] = velocity[1] = velocity[2] = 0;
-                // load direction i = 0;
-                // c_0 = (0, -1, -1)
-                f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)];
-                density += f0;
-                velocity[1] -= f0;
-                velocity[2] -= f0;
+                    #ifdef _ARBITRARYGEOMETRY_
+                    streamMask = !flagField[j];
+                    copyMask = !streamMask;
+                    #endif // _ARBITRARYGEOMETRY_
+                    // load direction i = 0;
+                    // c_0 = (0, -1, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)] * streamMask + copyMask * collideField[j];
+                    #else
+                    f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)];
+                    #endif
+                    density += f0;
+                    velocity[1] -= f0;
+                    velocity[2] -= f0;
 
-                // load direction i = 1;
-                // c_1 = (-1, 0, -1)
-                f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1];
-                density += f1;
-                velocity[0] -= f1;
-                velocity[2] -= f1;
+                    // load direction i = 1;
+                    // c_1 = (-1, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1] * streamMask + copyMask * collideField[j + numberOfCells];
+                    #else
+                    f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1];
+                    #endif
 
-                // load direction i = 2;
-                // c_2 = (0, 0, -1)
-                f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)];
-                density += f2;
-                velocity[2] -= f2;
+                    density += f1;
+                    velocity[0] -= f1;
+                    velocity[2] -= f1;
 
-                // load direction i = 3;
-                // c_3 = (1, 0, -1)
-                f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1];
-                density += f3;
-                velocity[0] += f3;
-                velocity[2] -= f3;
+                    // load direction i = 2;
+                    // c_2 = (0, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 2];
+                    #else
+                    f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)];
+                    #endif
 
-                // load direction i = 4;
-                // c_4 = (0, 1, -1)
-                f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)];
-                density += f4;
-                velocity[1] += f4;
-                velocity[2] -= f4;
+                    density += f2;
+                    velocity[2] -= f2;
 
-                // load direction i = 5;
-                // c_5 = (-1, -1, 0)
-                f5 = collideField[5 * numberOfCells + j + xlength[0] + 3];
-                density += f5;
-                velocity[0] -= f5;
-                velocity[1] -= f5;
+                    // load direction i = 3;
+                    // c_3 = (1, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1] * streamMask + copyMask * collideField[j + numberOfCells * 3];
+                    #else
+                    f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1];
+                    #endif
 
-                // load direction i = 6;
-                // c_6 = (0, -1, 0)
-                f6 = collideField[6 * numberOfCells + j + xlength[0] + 2];
-                density += f6;
-                velocity[1] -= f6;
+                    density += f3;
+                    velocity[0] += f3;
+                    velocity[2] -= f3;
 
-                // load direction i = 7;
-                // c_7 = (1, -1, 0)
-                f7 = collideField[7 * numberOfCells + j + xlength[0] + 1];
-                density += f7;
-                velocity[0] += f7;
-                velocity[1] -= f7;
+                    // load direction i = 4;
+                    // c_4 = (0, 1, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 4];
+                    #else
+                    f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)];
+                    #endif
 
-                // load direction i = 8;
-                // c_8 = (-1, 0, 0)
-                f8 = collideField[8 * numberOfCells + j + 1];
-                density += f8;
-                velocity[0] -= f8;
+                    density += f4;
+                    velocity[1] += f4;
+                    velocity[2] -= f4;
 
-                // load direction i = 9;
-                // c_9 = (0, 0, 0)
-                f9 = collideField[9 * numberOfCells + j];
-                density += f9;
+                    // load direction i = 5;
+                    // c_5 = (-1, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f5 = collideField[5 * numberOfCells + j + xlength[0] + 3] * streamMask + copyMask * collideField[j + numberOfCells * 5];
+                    #else
+                    f5 = collideField[5 * numberOfCells + j + xlength[0] + 3];
+                    #endif
 
-                // load direction i = 10;
-                // c_10 = (1, 0, 0)
-                f10 = collideField[10 * numberOfCells + j - 1];
-                density += f10;
-                velocity[0] += f10;
+                    density += f5;
+                    velocity[0] -= f5;
+                    velocity[1] -= f5;
 
-                // load direction i = 11;
-                // c_11 = (-1, 1, 0)
-                f11 = collideField[11 * numberOfCells + j - xlength[0] - 1];
-                density += f11;
-                velocity[0] -= f11;
-                velocity[1] += f11;
+                    // load direction i = 6;
+                    // c_6 = (0, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f6 = collideField[6 * numberOfCells + j + xlength[0] + 2] * streamMask + copyMask * collideField[j + numberOfCells * 6];
+                    #else
+                    f6 = collideField[6 * numberOfCells + j + xlength[0] + 2];
+                    #endif
 
-                // load direction i = 12;
-                // c_12 = (0, 1, 0)
-                f12 = collideField[12 * numberOfCells + j - xlength[0] - 2];
-                density += f12;
-                velocity[1] += f12;
+                    density += f6;
+                    velocity[1] -= f6;
 
-                // load direction i = 13;
-                // c_13 = (1, 1, 0)
-                f13 = collideField[13 * numberOfCells + j - xlength[0] - 3];
-                density += f13;
-                velocity[0] += f13;
-                velocity[1] += f13;
+                    // load direction i = 7;
+                    // c_7 = (1, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f7 = collideField[7 * numberOfCells + j + xlength[0] + 1] * streamMask + copyMask * collideField[j + numberOfCells * 7];
+                    #else
+                    f7 = collideField[7 * numberOfCells + j + xlength[0] + 1];
+                    #endif
 
-                // load direction i = 14;
-                // c_14 = (0, -1, 1)
-                f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)];
-                density += f14;
-                velocity[1] -= f14;
-                velocity[2] += f14;
+                    density += f7;
+                    velocity[0] += f7;
+                    velocity[1] -= f7;
 
-                // load direction i = 15;
-                // c_15 = (-1, 0, 1)
-                f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1];
-                density += f15;
-                velocity[0] -= f15;
-                velocity[2] += f15;
+                    // load direction i = 8;
+                    // c_8 = (-1, 0, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f8 = collideField[8 * numberOfCells + j + 1] * streamMask + copyMask * collideField[j + numberOfCells * 8];
+                    #else
+                    f8 = collideField[8 * numberOfCells + j + 1];
+                    #endif
 
-                // load direction i = 16;
-                // c_16 = (0, 0, 1)
-                f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)];
-                density += f16;
-                velocity[2] += f16;
+                    density += f8;
+                    velocity[0] -= f8;
 
-                // load direction i = 17;
-                // c_17 = (1, 0, 1)
-                f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1];
-                density += f17;
-                velocity[0] += f17;
-                velocity[2] += f17;
+                    // load direction i = 9;
+                    // c_9 = (0, 0, 0)
+                    f9 = collideField[9 * numberOfCells + j];
+                    density += f9;
 
-                // load direction i = 18;
-                // c_18 = (0, 1, 1)
-                f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)];
-                density += f18;
-                velocity[1] += f18;
-                velocity[2] += f18;
+                    // load direction i = 10;
+                    // c_10 = (1, 0, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f10 = collideField[10 * numberOfCells + j - 1] * streamMask + copyMask * collideField[j + numberOfCells * 11];
+                    #else
+                    f10 = collideField[10 * numberOfCells + j - 1];
+                    #endif
+
+                    density += f10;
+                    velocity[0] += f10;
+
+                    // load direction i = 11;
+                    // c_11 = (-1, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f11 = collideField[11 * numberOfCells + j - xlength[0] - 1] * streamMask + copyMask * collideField[j + numberOfCells * 11];
+                    #else
+                    f11 = collideField[11 * numberOfCells + j - xlength[0] - 1];
+                    #endif
+
+                    density += f11;
+                    velocity[0] -= f11;
+                    velocity[1] += f11;
+
+                    // load direction i = 12;
+                    // c_12 = (0, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f12 = collideField[12 * numberOfCells + j - xlength[0] - 2] * streamMask + copyMask * collideField[j + numberOfCells * 12];
+                    #else
+                    f12 = collideField[12 * numberOfCells + j - xlength[0] - 2];
+                    #endif
+
+                    density += f12;
+                    velocity[1] += f12;
+
+                    // load direction i = 13;
+                    // c_13 = (1, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f13 = collideField[13 * numberOfCells + j - xlength[0] - 3] * streamMask + copyMask * collideField[j + numberOfCells * 13];
+                    #else
+                    f13 = collideField[13 * numberOfCells + j - xlength[0] - 3];
+                    #endif
+
+                    density += f13;
+                    velocity[0] += f13;
+                    velocity[1] += f13;
+
+                    // load direction i = 14;
+                    // c_14 = (0, -1, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)] * streamMask + copyMask * collideField[j + numberOfCells * 14];
+                    #else
+                    f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)];
+                    #endif
+
+                    density += f14;
+                    velocity[1] -= f14;
+                    velocity[2] += f14;
+
+                    // load direction i = 15;
+                    // c_15 = (-1, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1] * streamMask + copyMask * collideField[j + numberOfCells * 15];
+                    #else
+                    f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1];
+                    #endif
+
+                    density += f15;
+                    velocity[0] -= f15;
+                    velocity[2] += f15;
+
+                    // load direction i = 16;
+                    // c_16 = (0, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 16];
+                    #else
+                    f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)];
+                    #endif
+
+                    density += f16;
+                    velocity[2] += f16;
+
+                    // load direction i = 17;
+                    // c_17 = (1, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1] * streamMask + copyMask * collideField[j + numberOfCells * 17];
+                    #else
+                    f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1];
+                    #endif
+
+                    density += f17;
+                    velocity[0] += f17;
+                    velocity[2] += f17;
+
+                    // load direction i = 18;
+                    // c_18 = (0, 1, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)] * streamMask + copyMask * collideField[j + numberOfCells * 18];
+                    #else
+                    f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)];
+                    #endif
+
+                    density += f18;
+                    velocity[1] += f18;
+                    velocity[2] += f18;
 
                 velocity[0] = velocity[0] / density;
                 velocity[1] = velocity[1] / density;
@@ -1598,132 +2267,223 @@ void doStreamingAndCollision(double *collideField, double *streamField,int *flag
                 if (counter != j)
                     printf("ERROR: Counters differ!\n");
                 density = velocity[0] = velocity[1] = velocity[2] = 0;
+                    #ifdef _ARBITRARYGEOMETRY_
+                    streamMask = !flagField[j];
+                    copyMask = !streamMask;
+                    #endif // _ARBITRARYGEOMETRY_
+                    // load direction i = 0;
+                    // c_0 = (0, -1, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)] * streamMask + copyMask * collideField[j];
+                    #else
+                    f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)];
+                    #endif
+                    density += f0;
+                    velocity[1] -= f0;
+                    velocity[2] -= f0;
 
-                // load direction i = 0;
-                // c_0 = (0, -1, -1)
-                f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)];
-                density += f0;
-                velocity[1] -= f0;
-                velocity[2] -= f0;
+                    // load direction i = 1;
+                    // c_1 = (-1, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1] * streamMask + copyMask * collideField[j + numberOfCells];
+                    #else
+                    f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1];
+                    #endif
 
-                // load direction i = 1;
-                // c_1 = (-1, 0, -1)
-                f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1];
-                density += f1;
-                velocity[0] -= f1;
-                velocity[2] -= f1;
+                    density += f1;
+                    velocity[0] -= f1;
+                    velocity[2] -= f1;
 
-                // load direction i = 2;
-                // c_2 = (0, 0, -1)
-                f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)];
-                density += f2;
-                velocity[2] -= f2;
+                    // load direction i = 2;
+                    // c_2 = (0, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 2];
+                    #else
+                    f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)];
+                    #endif
 
-                // load direction i = 3;
-                // c_3 = (1, 0, -1)
-                f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1];
-                density += f3;
-                velocity[0] += f3;
-                velocity[2] -= f3;
+                    density += f2;
+                    velocity[2] -= f2;
 
-                // load direction i = 4;
-                // c_4 = (0, 1, -1)
-                f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)];
-                density += f4;
-                velocity[1] += f4;
-                velocity[2] -= f4;
+                    // load direction i = 3;
+                    // c_3 = (1, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1] * streamMask + copyMask * collideField[j + numberOfCells * 3];
+                    #else
+                    f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1];
+                    #endif
 
-                // load direction i = 5;
-                // c_5 = (-1, -1, 0)
-                f5 = collideField[5 * numberOfCells + j + xlength[0] + 3];
-                density += f5;
-                velocity[0] -= f5;
-                velocity[1] -= f5;
+                    density += f3;
+                    velocity[0] += f3;
+                    velocity[2] -= f3;
 
-                // load direction i = 6;
-                // c_6 = (0, -1, 0)
-                f6 = collideField[6 * numberOfCells + j + xlength[0] + 2];
-                density += f6;
-                velocity[1] -= f6;
+                    // load direction i = 4;
+                    // c_4 = (0, 1, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 4];
+                    #else
+                    f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)];
+                    #endif
 
-                // load direction i = 7;
-                // c_7 = (1, -1, 0)
-                f7 = collideField[7 * numberOfCells + j + xlength[0] + 1];
-                density += f7;
-                velocity[0] += f7;
-                velocity[1] -= f7;
+                    density += f4;
+                    velocity[1] += f4;
+                    velocity[2] -= f4;
 
-                // load direction i = 8;
-                // c_8 = (-1, 0, 0)
-                f8 = collideField[8 * numberOfCells + j + 1];
-                density += f8;
-                velocity[0] -= f8;
+                    // load direction i = 5;
+                    // c_5 = (-1, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f5 = collideField[5 * numberOfCells + j + xlength[0] + 3] * streamMask + copyMask * collideField[j + numberOfCells * 5];
+                    #else
+                    f5 = collideField[5 * numberOfCells + j + xlength[0] + 3];
+                    #endif
 
-                // load direction i = 9;
-                // c_9 = (0, 0, 0)
-                f9 = collideField[9 * numberOfCells + j];
-                density += f9;
+                    density += f5;
+                    velocity[0] -= f5;
+                    velocity[1] -= f5;
 
-                // load direction i = 10;
-                // c_10 = (1, 0, 0)
-                f10 = collideField[10 * numberOfCells + j - 1];
-                density += f10;
-                velocity[0] += f10;
+                    // load direction i = 6;
+                    // c_6 = (0, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f6 = collideField[6 * numberOfCells + j + xlength[0] + 2] * streamMask + copyMask * collideField[j + numberOfCells * 6];
+                    #else
+                    f6 = collideField[6 * numberOfCells + j + xlength[0] + 2];
+                    #endif
 
-                // load direction i = 11;
-                // c_11 = (-1, 1, 0)
-                f11 = collideField[11 * numberOfCells + j - xlength[0] - 1];
-                density += f11;
-                velocity[0] -= f11;
-                velocity[1] += f11;
+                    density += f6;
+                    velocity[1] -= f6;
 
-                // load direction i = 12;
-                // c_12 = (0, 1, 0)
-                f12 = collideField[12 * numberOfCells + j - xlength[0] - 2];
-                density += f12;
-                velocity[1] += f12;
+                    // load direction i = 7;
+                    // c_7 = (1, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f7 = collideField[7 * numberOfCells + j + xlength[0] + 1] * streamMask + copyMask * collideField[j + numberOfCells * 7];
+                    #else
+                    f7 = collideField[7 * numberOfCells + j + xlength[0] + 1];
+                    #endif
 
-                // load direction i = 13;
-                // c_13 = (1, 1, 0)
-                f13 = collideField[13 * numberOfCells + j - xlength[0] - 3];
-                density += f13;
-                velocity[0] += f13;
-                velocity[1] += f13;
+                    density += f7;
+                    velocity[0] += f7;
+                    velocity[1] -= f7;
 
-                // load direction i = 14;
-                // c_14 = (0, -1, 1)
-                f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)];
-                density += f14;
-                velocity[1] -= f14;
-                velocity[2] += f14;
+                    // load direction i = 8;
+                    // c_8 = (-1, 0, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f8 = collideField[8 * numberOfCells + j + 1] * streamMask + copyMask * collideField[j + numberOfCells * 8];
+                    #else
+                    f8 = collideField[8 * numberOfCells + j + 1];
+                    #endif
 
-                // load direction i = 15;
-                // c_15 = (-1, 0, 1)
-                f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1];
-                density += f15;
-                velocity[0] -= f15;
-                velocity[2] += f15;
+                    density += f8;
+                    velocity[0] -= f8;
 
-                // load direction i = 16;
-                // c_16 = (0, 0, 1)
-                f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)];
-                density += f16;
-                velocity[2] += f16;
+                    // load direction i = 9;
+                    // c_9 = (0, 0, 0)
+                    f9 = collideField[9 * numberOfCells + j];
+                    density += f9;
 
-                // load direction i = 17;
-                // c_17 = (1, 0, 1)
-                f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1];
-                density += f17;
-                velocity[0] += f17;
-                velocity[2] += f17;
+                    // load direction i = 10;
+                    // c_10 = (1, 0, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f10 = collideField[10 * numberOfCells + j - 1] * streamMask + copyMask * collideField[j + numberOfCells * 11];
+                    #else
+                    f10 = collideField[10 * numberOfCells + j - 1];
+                    #endif
 
-                // load direction i = 18;
-                // c_18 = (0, 1, 1)
-                f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)];
-                density += f18;
-                velocity[1] += f18;
-                velocity[2] += f18;
+                    density += f10;
+                    velocity[0] += f10;
 
+                    // load direction i = 11;
+                    // c_11 = (-1, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f11 = collideField[11 * numberOfCells + j - xlength[0] - 1] * streamMask + copyMask * collideField[j + numberOfCells * 11];
+                    #else
+                    f11 = collideField[11 * numberOfCells + j - xlength[0] - 1];
+                    #endif
+
+                    density += f11;
+                    velocity[0] -= f11;
+                    velocity[1] += f11;
+
+                    // load direction i = 12;
+                    // c_12 = (0, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f12 = collideField[12 * numberOfCells + j - xlength[0] - 2] * streamMask + copyMask * collideField[j + numberOfCells * 12];
+                    #else
+                    f12 = collideField[12 * numberOfCells + j - xlength[0] - 2];
+                    #endif
+
+                    density += f12;
+                    velocity[1] += f12;
+
+                    // load direction i = 13;
+                    // c_13 = (1, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f13 = collideField[13 * numberOfCells + j - xlength[0] - 3] * streamMask + copyMask * collideField[j + numberOfCells * 13];
+                    #else
+                    f13 = collideField[13 * numberOfCells + j - xlength[0] - 3];
+                    #endif
+
+                    density += f13;
+                    velocity[0] += f13;
+                    velocity[1] += f13;
+
+                    // load direction i = 14;
+                    // c_14 = (0, -1, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)] * streamMask + copyMask * collideField[j + numberOfCells * 14];
+                    #else
+                    f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)];
+                    #endif
+
+                    density += f14;
+                    velocity[1] -= f14;
+                    velocity[2] += f14;
+
+                    // load direction i = 15;
+                    // c_15 = (-1, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1] * streamMask + copyMask * collideField[j + numberOfCells * 15];
+                    #else
+                    f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1];
+                    #endif
+
+                    density += f15;
+                    velocity[0] -= f15;
+                    velocity[2] += f15;
+
+                    // load direction i = 16;
+                    // c_16 = (0, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 16];
+                    #else
+                    f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)];
+                    #endif
+
+                    density += f16;
+                    velocity[2] += f16;
+
+                    // load direction i = 17;
+                    // c_17 = (1, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1] * streamMask + copyMask * collideField[j + numberOfCells * 17];
+                    #else
+                    f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1];
+                    #endif
+
+                    density += f17;
+                    velocity[0] += f17;
+                    velocity[2] += f17;
+
+                    // load direction i = 18;
+                    // c_18 = (0, 1, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)] * streamMask + copyMask * collideField[j + numberOfCells * 18];
+                    #else
+                    f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)];
+                    #endif
+
+                    density += f18;
+                    velocity[1] += f18;
+                    velocity[2] += f18;
                 velocity[0] = velocity[0] / density;
                 velocity[1] = velocity[1] / density;
                 velocity[2] = velocity[2] / density;
@@ -1822,131 +2582,223 @@ void doStreamingAndCollision(double *collideField, double *streamField,int *flag
             for (x = 1; x <= xlength[0]; x++)
             {
                 density = velocity[0] = velocity[1] = velocity[2] = 0;
+                    #ifdef _ARBITRARYGEOMETRY_
+                    streamMask = !flagField[j];
+                    copyMask = !streamMask;
+                    #endif // _ARBITRARYGEOMETRY_
+                    // load direction i = 0;
+                    // c_0 = (0, -1, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)] * streamMask + copyMask * collideField[j];
+                    #else
+                    f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)];
+                    #endif
+                    density += f0;
+                    velocity[1] -= f0;
+                    velocity[2] -= f0;
 
-                // load direction i = 0;
-                // c_0 = (0, -1, -1)
-                f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)];
-                density += f0;
-                velocity[1] -= f0;
-                velocity[2] -= f0;
+                    // load direction i = 1;
+                    // c_1 = (-1, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1] * streamMask + copyMask * collideField[j + numberOfCells];
+                    #else
+                    f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1];
+                    #endif
 
-                // load direction i = 1;
-                // c_1 = (-1, 0, -1)
-                f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1];
-                density += f1;
-                velocity[0] -= f1;
-                velocity[2] -= f1;
+                    density += f1;
+                    velocity[0] -= f1;
+                    velocity[2] -= f1;
 
-                // load direction i = 2;
-                // c_2 = (0, 0, -1)
-                f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)];
-                density += f2;
-                velocity[2] -= f2;
+                    // load direction i = 2;
+                    // c_2 = (0, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 2];
+                    #else
+                    f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)];
+                    #endif
 
-                // load direction i = 3;
-                // c_3 = (1, 0, -1)
-                f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1];
-                density += f3;
-                velocity[0] += f3;
-                velocity[2] -= f3;
+                    density += f2;
+                    velocity[2] -= f2;
 
-                // load direction i = 4;
-                // c_4 = (0, 1, -1)
-                f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)];
-                density += f4;
-                velocity[1] += f4;
-                velocity[2] -= f4;
+                    // load direction i = 3;
+                    // c_3 = (1, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1] * streamMask + copyMask * collideField[j + numberOfCells * 3];
+                    #else
+                    f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1];
+                    #endif
 
-                // load direction i = 5;
-                // c_5 = (-1, -1, 0)
-                f5 = collideField[5 * numberOfCells + j + xlength[0] + 3];
-                density += f5;
-                velocity[0] -= f5;
-                velocity[1] -= f5;
+                    density += f3;
+                    velocity[0] += f3;
+                    velocity[2] -= f3;
 
-                // load direction i = 6;
-                // c_6 = (0, -1, 0)
-                f6 = collideField[6 * numberOfCells + j + xlength[0] + 2];
-                density += f6;
-                velocity[1] -= f6;
+                    // load direction i = 4;
+                    // c_4 = (0, 1, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 4];
+                    #else
+                    f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)];
+                    #endif
 
-                // load direction i = 7;
-                // c_7 = (1, -1, 0)
-                f7 = collideField[7 * numberOfCells + j + xlength[0] + 1];
-                density += f7;
-                velocity[0] += f7;
-                velocity[1] -= f7;
+                    density += f4;
+                    velocity[1] += f4;
+                    velocity[2] -= f4;
 
-                // load direction i = 8;
-                // c_8 = (-1, 0, 0)
-                f8 = collideField[8 * numberOfCells + j + 1];
-                density += f8;
-                velocity[0] -= f8;
+                    // load direction i = 5;
+                    // c_5 = (-1, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f5 = collideField[5 * numberOfCells + j + xlength[0] + 3] * streamMask + copyMask * collideField[j + numberOfCells * 5];
+                    #else
+                    f5 = collideField[5 * numberOfCells + j + xlength[0] + 3];
+                    #endif
 
-                // load direction i = 9;
-                // c_9 = (0, 0, 0)
-                f9 = collideField[9 * numberOfCells + j];
-                density += f9;
+                    density += f5;
+                    velocity[0] -= f5;
+                    velocity[1] -= f5;
 
-                // load direction i = 10;
-                // c_10 = (1, 0, 0)
-                f10 = collideField[10 * numberOfCells + j - 1];
-                density += f10;
-                velocity[0] += f10;
+                    // load direction i = 6;
+                    // c_6 = (0, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f6 = collideField[6 * numberOfCells + j + xlength[0] + 2] * streamMask + copyMask * collideField[j + numberOfCells * 6];
+                    #else
+                    f6 = collideField[6 * numberOfCells + j + xlength[0] + 2];
+                    #endif
 
-                // load direction i = 11;
-                // c_11 = (-1, 1, 0)
-                f11 = collideField[11 * numberOfCells + j - xlength[0] - 1];
-                density += f11;
-                velocity[0] -= f11;
-                velocity[1] += f11;
+                    density += f6;
+                    velocity[1] -= f6;
 
-                // load direction i = 12;
-                // c_12 = (0, 1, 0)
-                f12 = collideField[12 * numberOfCells + j - xlength[0] - 2];
-                density += f12;
-                velocity[1] += f12;
+                    // load direction i = 7;
+                    // c_7 = (1, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f7 = collideField[7 * numberOfCells + j + xlength[0] + 1] * streamMask + copyMask * collideField[j + numberOfCells * 7];
+                    #else
+                    f7 = collideField[7 * numberOfCells + j + xlength[0] + 1];
+                    #endif
 
-                // load direction i = 13;
-                // c_13 = (1, 1, 0)
-                f13 = collideField[13 * numberOfCells + j - xlength[0] - 3];
-                density += f13;
-                velocity[0] += f13;
-                velocity[1] += f13;
+                    density += f7;
+                    velocity[0] += f7;
+                    velocity[1] -= f7;
 
-                // load direction i = 14;
-                // c_14 = (0, -1, 1)
-                f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)];
-                density += f14;
-                velocity[1] -= f14;
-                velocity[2] += f14;
+                    // load direction i = 8;
+                    // c_8 = (-1, 0, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f8 = collideField[8 * numberOfCells + j + 1] * streamMask + copyMask * collideField[j + numberOfCells * 8];
+                    #else
+                    f8 = collideField[8 * numberOfCells + j + 1];
+                    #endif
 
-                // load direction i = 15;
-                // c_15 = (-1, 0, 1)
-                f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1];
-                density += f15;
-                velocity[0] -= f15;
-                velocity[2] += f15;
+                    density += f8;
+                    velocity[0] -= f8;
 
-                // load direction i = 16;
-                // c_16 = (0, 0, 1)
-                f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)];
-                density += f16;
-                velocity[2] += f16;
+                    // load direction i = 9;
+                    // c_9 = (0, 0, 0)
+                    f9 = collideField[9 * numberOfCells + j];
+                    density += f9;
 
-                // load direction i = 17;
-                // c_17 = (1, 0, 1)
-                f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1];
-                density += f17;
-                velocity[0] += f17;
-                velocity[2] += f17;
+                    // load direction i = 10;
+                    // c_10 = (1, 0, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f10 = collideField[10 * numberOfCells + j - 1] * streamMask + copyMask * collideField[j + numberOfCells * 11];
+                    #else
+                    f10 = collideField[10 * numberOfCells + j - 1];
+                    #endif
 
-                // load direction i = 18;
-                // c_18 = (0, 1, 1)
-                f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)];
-                density += f18;
-                velocity[1] += f18;
-                velocity[2] += f18;
+                    density += f10;
+                    velocity[0] += f10;
+
+                    // load direction i = 11;
+                    // c_11 = (-1, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f11 = collideField[11 * numberOfCells + j - xlength[0] - 1] * streamMask + copyMask * collideField[j + numberOfCells * 11];
+                    #else
+                    f11 = collideField[11 * numberOfCells + j - xlength[0] - 1];
+                    #endif
+
+                    density += f11;
+                    velocity[0] -= f11;
+                    velocity[1] += f11;
+
+                    // load direction i = 12;
+                    // c_12 = (0, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f12 = collideField[12 * numberOfCells + j - xlength[0] - 2] * streamMask + copyMask * collideField[j + numberOfCells * 12];
+                    #else
+                    f12 = collideField[12 * numberOfCells + j - xlength[0] - 2];
+                    #endif
+
+                    density += f12;
+                    velocity[1] += f12;
+
+                    // load direction i = 13;
+                    // c_13 = (1, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f13 = collideField[13 * numberOfCells + j - xlength[0] - 3] * streamMask + copyMask * collideField[j + numberOfCells * 13];
+                    #else
+                    f13 = collideField[13 * numberOfCells + j - xlength[0] - 3];
+                    #endif
+
+                    density += f13;
+                    velocity[0] += f13;
+                    velocity[1] += f13;
+
+                    // load direction i = 14;
+                    // c_14 = (0, -1, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)] * streamMask + copyMask * collideField[j + numberOfCells * 14];
+                    #else
+                    f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)];
+                    #endif
+
+                    density += f14;
+                    velocity[1] -= f14;
+                    velocity[2] += f14;
+
+                    // load direction i = 15;
+                    // c_15 = (-1, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1] * streamMask + copyMask * collideField[j + numberOfCells * 15];
+                    #else
+                    f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1];
+                    #endif
+
+                    density += f15;
+                    velocity[0] -= f15;
+                    velocity[2] += f15;
+
+                    // load direction i = 16;
+                    // c_16 = (0, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 16];
+                    #else
+                    f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)];
+                    #endif
+
+                    density += f16;
+                    velocity[2] += f16;
+
+                    // load direction i = 17;
+                    // c_17 = (1, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1] * streamMask + copyMask * collideField[j + numberOfCells * 17];
+                    #else
+                    f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1];
+                    #endif
+
+                    density += f17;
+                    velocity[0] += f17;
+                    velocity[2] += f17;
+
+                    // load direction i = 18;
+                    // c_18 = (0, 1, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)] * streamMask + copyMask * collideField[j + numberOfCells * 18];
+                    #else
+                    f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)];
+                    #endif
+
+                    density += f18;
+                    velocity[1] += f18;
+                    velocity[2] += f18;
 
                 velocity[0] = velocity[0] / density;
                 velocity[1] = velocity[1] / density;
@@ -2040,132 +2892,223 @@ void doStreamingAndCollision(double *collideField, double *streamField,int *flag
             for (x = 1; x <= xlength[0]; x++)
             {
                 density = velocity[0] = velocity[1] = velocity[2] = 0;
+                    #ifdef _ARBITRARYGEOMETRY_
+                    streamMask = !flagField[j];
+                    copyMask = !streamMask;
+                    #endif // _ARBITRARYGEOMETRY_
+                    // load direction i = 0;
+                    // c_0 = (0, -1, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)] * streamMask + copyMask * collideField[j];
+                    #else
+                    f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)];
+                    #endif
+                    density += f0;
+                    velocity[1] -= f0;
+                    velocity[2] -= f0;
 
-                // load direction i = 0;
-                // c_0 = (0, -1, -1)
-                f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)];
-                density += f0;
-                velocity[1] -= f0;
-                velocity[2] -= f0;
+                    // load direction i = 1;
+                    // c_1 = (-1, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1] * streamMask + copyMask * collideField[j + numberOfCells];
+                    #else
+                    f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1];
+                    #endif
 
-                // load direction i = 1;
-                // c_1 = (-1, 0, -1)
-                f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1];
-                density += f1;
-                velocity[0] -= f1;
-                velocity[2] -= f1;
+                    density += f1;
+                    velocity[0] -= f1;
+                    velocity[2] -= f1;
 
-                // load direction i = 2;
-                // c_2 = (0, 0, -1)
-                f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)];
-                density += f2;
-                velocity[2] -= f2;
+                    // load direction i = 2;
+                    // c_2 = (0, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 2];
+                    #else
+                    f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)];
+                    #endif
 
-                // load direction i = 3;
-                // c_3 = (1, 0, -1)
-                f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1];
-                density += f3;
-                velocity[0] += f3;
-                velocity[2] -= f3;
+                    density += f2;
+                    velocity[2] -= f2;
 
-                // load direction i = 4;
-                // c_4 = (0, 1, -1)
-                f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)];
-                density += f4;
-                velocity[1] += f4;
-                velocity[2] -= f4;
+                    // load direction i = 3;
+                    // c_3 = (1, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1] * streamMask + copyMask * collideField[j + numberOfCells * 3];
+                    #else
+                    f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1];
+                    #endif
 
-                // load direction i = 5;
-                // c_5 = (-1, -1, 0)
-                f5 = collideField[5 * numberOfCells + j + xlength[0] + 3];
-                density += f5;
-                velocity[0] -= f5;
-                velocity[1] -= f5;
+                    density += f3;
+                    velocity[0] += f3;
+                    velocity[2] -= f3;
 
-                // load direction i = 6;
-                // c_6 = (0, -1, 0)
-                f6 = collideField[6 * numberOfCells + j + xlength[0] + 2];
-                density += f6;
-                velocity[1] -= f6;
+                    // load direction i = 4;
+                    // c_4 = (0, 1, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 4];
+                    #else
+                    f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)];
+                    #endif
 
-                // load direction i = 7;
-                // c_7 = (1, -1, 0)
-                f7 = collideField[7 * numberOfCells + j + xlength[0] + 1];
-                density += f7;
-                velocity[0] += f7;
-                velocity[1] -= f7;
+                    density += f4;
+                    velocity[1] += f4;
+                    velocity[2] -= f4;
 
-                // load direction i = 8;
-                // c_8 = (-1, 0, 0)
-                f8 = collideField[8 * numberOfCells + j + 1];
-                density += f8;
-                velocity[0] -= f8;
+                    // load direction i = 5;
+                    // c_5 = (-1, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f5 = collideField[5 * numberOfCells + j + xlength[0] + 3] * streamMask + copyMask * collideField[j + numberOfCells * 5];
+                    #else
+                    f5 = collideField[5 * numberOfCells + j + xlength[0] + 3];
+                    #endif
 
-                // load direction i = 9;
-                // c_9 = (0, 0, 0)
-                f9 = collideField[9 * numberOfCells + j];
-                density += f9;
+                    density += f5;
+                    velocity[0] -= f5;
+                    velocity[1] -= f5;
 
-                // load direction i = 10;
-                // c_10 = (1, 0, 0)
-                f10 = collideField[10 * numberOfCells + j - 1];
-                density += f10;
-                velocity[0] += f10;
+                    // load direction i = 6;
+                    // c_6 = (0, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f6 = collideField[6 * numberOfCells + j + xlength[0] + 2] * streamMask + copyMask * collideField[j + numberOfCells * 6];
+                    #else
+                    f6 = collideField[6 * numberOfCells + j + xlength[0] + 2];
+                    #endif
 
-                // load direction i = 11;
-                // c_11 = (-1, 1, 0)
-                f11 = collideField[11 * numberOfCells + j - xlength[0] - 1];
-                density += f11;
-                velocity[0] -= f11;
-                velocity[1] += f11;
+                    density += f6;
+                    velocity[1] -= f6;
 
-                // load direction i = 12;
-                // c_12 = (0, 1, 0)
-                f12 = collideField[12 * numberOfCells + j - xlength[0] - 2];
-                density += f12;
-                velocity[1] += f12;
+                    // load direction i = 7;
+                    // c_7 = (1, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f7 = collideField[7 * numberOfCells + j + xlength[0] + 1] * streamMask + copyMask * collideField[j + numberOfCells * 7];
+                    #else
+                    f7 = collideField[7 * numberOfCells + j + xlength[0] + 1];
+                    #endif
 
-                // load direction i = 13;
-                // c_13 = (1, 1, 0)
-                f13 = collideField[13 * numberOfCells + j - xlength[0] - 3];
-                density += f13;
-                velocity[0] += f13;
-                velocity[1] += f13;
+                    density += f7;
+                    velocity[0] += f7;
+                    velocity[1] -= f7;
 
-                // load direction i = 14;
-                // c_14 = (0, -1, 1)
-                f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)];
-                density += f14;
-                velocity[1] -= f14;
-                velocity[2] += f14;
+                    // load direction i = 8;
+                    // c_8 = (-1, 0, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f8 = collideField[8 * numberOfCells + j + 1] * streamMask + copyMask * collideField[j + numberOfCells * 8];
+                    #else
+                    f8 = collideField[8 * numberOfCells + j + 1];
+                    #endif
 
-                // load direction i = 15;
-                // c_15 = (-1, 0, 1)
-                f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1];
-                density += f15;
-                velocity[0] -= f15;
-                velocity[2] += f15;
+                    density += f8;
+                    velocity[0] -= f8;
 
-                // load direction i = 16;
-                // c_16 = (0, 0, 1)
-                f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)];
-                density += f16;
-                velocity[2] += f16;
+                    // load direction i = 9;
+                    // c_9 = (0, 0, 0)
+                    f9 = collideField[9 * numberOfCells + j];
+                    density += f9;
 
-                // load direction i = 17;
-                // c_17 = (1, 0, 1)
-                f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1];
-                density += f17;
-                velocity[0] += f17;
-                velocity[2] += f17;
+                    // load direction i = 10;
+                    // c_10 = (1, 0, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f10 = collideField[10 * numberOfCells + j - 1] * streamMask + copyMask * collideField[j + numberOfCells * 11];
+                    #else
+                    f10 = collideField[10 * numberOfCells + j - 1];
+                    #endif
 
-                // load direction i = 18;
-                // c_18 = (0, 1, 1)
-                f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)];
-                density += f18;
-                velocity[1] += f18;
-                velocity[2] += f18;
+                    density += f10;
+                    velocity[0] += f10;
 
+                    // load direction i = 11;
+                    // c_11 = (-1, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f11 = collideField[11 * numberOfCells + j - xlength[0] - 1] * streamMask + copyMask * collideField[j + numberOfCells * 11];
+                    #else
+                    f11 = collideField[11 * numberOfCells + j - xlength[0] - 1];
+                    #endif
+
+                    density += f11;
+                    velocity[0] -= f11;
+                    velocity[1] += f11;
+
+                    // load direction i = 12;
+                    // c_12 = (0, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f12 = collideField[12 * numberOfCells + j - xlength[0] - 2] * streamMask + copyMask * collideField[j + numberOfCells * 12];
+                    #else
+                    f12 = collideField[12 * numberOfCells + j - xlength[0] - 2];
+                    #endif
+
+                    density += f12;
+                    velocity[1] += f12;
+
+                    // load direction i = 13;
+                    // c_13 = (1, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f13 = collideField[13 * numberOfCells + j - xlength[0] - 3] * streamMask + copyMask * collideField[j + numberOfCells * 13];
+                    #else
+                    f13 = collideField[13 * numberOfCells + j - xlength[0] - 3];
+                    #endif
+
+                    density += f13;
+                    velocity[0] += f13;
+                    velocity[1] += f13;
+
+                    // load direction i = 14;
+                    // c_14 = (0, -1, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)] * streamMask + copyMask * collideField[j + numberOfCells * 14];
+                    #else
+                    f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)];
+                    #endif
+
+                    density += f14;
+                    velocity[1] -= f14;
+                    velocity[2] += f14;
+
+                    // load direction i = 15;
+                    // c_15 = (-1, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1] * streamMask + copyMask * collideField[j + numberOfCells * 15];
+                    #else
+                    f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1];
+                    #endif
+
+                    density += f15;
+                    velocity[0] -= f15;
+                    velocity[2] += f15;
+
+                    // load direction i = 16;
+                    // c_16 = (0, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 16];
+                    #else
+                    f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)];
+                    #endif
+
+                    density += f16;
+                    velocity[2] += f16;
+
+                    // load direction i = 17;
+                    // c_17 = (1, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1] * streamMask + copyMask * collideField[j + numberOfCells * 17];
+                    #else
+                    f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1];
+                    #endif
+
+                    density += f17;
+                    velocity[0] += f17;
+                    velocity[2] += f17;
+
+                    // load direction i = 18;
+                    // c_18 = (0, 1, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)] * streamMask + copyMask * collideField[j + numberOfCells * 18];
+                    #else
+                    f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)];
+                    #endif
+
+                    density += f18;
+                    velocity[1] += f18;
+                    velocity[2] += f18;
                 velocity[0] = velocity[0] / density;
                 velocity[1] = velocity[1] / density;
                 velocity[2] = velocity[2] / density;
@@ -2263,131 +3206,223 @@ void doStreamingAndCollision(double *collideField, double *streamField,int *flag
             for (x = 1; x <= xlength[0]; x++)
             {
                 density = velocity[0] = velocity[1] = velocity[2] = 0;
+                    #ifdef _ARBITRARYGEOMETRY_
+                    streamMask = !flagField[j];
+                    copyMask = !streamMask;
+                    #endif // _ARBITRARYGEOMETRY_
+                    // load direction i = 0;
+                    // c_0 = (0, -1, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)] * streamMask + copyMask * collideField[j];
+                    #else
+                    f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)];
+                    #endif
+                    density += f0;
+                    velocity[1] -= f0;
+                    velocity[2] -= f0;
 
-                // load direction i = 0;
-                // c_0 = (0, -1, -1)
-                f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)];
-                density += f0;
-                velocity[1] -= f0;
-                velocity[2] -= f0;
+                    // load direction i = 1;
+                    // c_1 = (-1, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1] * streamMask + copyMask * collideField[j + numberOfCells];
+                    #else
+                    f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1];
+                    #endif
 
-                // load direction i = 1;
-                // c_1 = (-1, 0, -1)
-                f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1];
-                density += f1;
-                velocity[0] -= f1;
-                velocity[2] -= f1;
+                    density += f1;
+                    velocity[0] -= f1;
+                    velocity[2] -= f1;
 
-                // load direction i = 2;
-                // c_2 = (0, 0, -1)
-                f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)];
-                density += f2;
-                velocity[2] -= f2;
+                    // load direction i = 2;
+                    // c_2 = (0, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 2];
+                    #else
+                    f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)];
+                    #endif
 
-                // load direction i = 3;
-                // c_3 = (1, 0, -1)
-                f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1];
-                density += f3;
-                velocity[0] += f3;
-                velocity[2] -= f3;
+                    density += f2;
+                    velocity[2] -= f2;
 
-                // load direction i = 4;
-                // c_4 = (0, 1, -1)
-                f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)];
-                density += f4;
-                velocity[1] += f4;
-                velocity[2] -= f4;
+                    // load direction i = 3;
+                    // c_3 = (1, 0, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1] * streamMask + copyMask * collideField[j + numberOfCells * 3];
+                    #else
+                    f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1];
+                    #endif
 
-                // load direction i = 5;
-                // c_5 = (-1, -1, 0)
-                f5 = collideField[5 * numberOfCells + j + xlength[0] + 3];
-                density += f5;
-                velocity[0] -= f5;
-                velocity[1] -= f5;
+                    density += f3;
+                    velocity[0] += f3;
+                    velocity[2] -= f3;
 
-                // load direction i = 6;
-                // c_6 = (0, -1, 0)
-                f6 = collideField[6 * numberOfCells + j + xlength[0] + 2];
-                density += f6;
-                velocity[1] -= f6;
+                    // load direction i = 4;
+                    // c_4 = (0, 1, -1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 4];
+                    #else
+                    f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)];
+                    #endif
 
-                // load direction i = 7;
-                // c_7 = (1, -1, 0)
-                f7 = collideField[7 * numberOfCells + j + xlength[0] + 1];
-                density += f7;
-                velocity[0] += f7;
-                velocity[1] -= f7;
+                    density += f4;
+                    velocity[1] += f4;
+                    velocity[2] -= f4;
 
-                // load direction i = 8;
-                // c_8 = (-1, 0, 0)
-                f8 = collideField[8 * numberOfCells + j + 1];
-                density += f8;
-                velocity[0] -= f8;
+                    // load direction i = 5;
+                    // c_5 = (-1, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f5 = collideField[5 * numberOfCells + j + xlength[0] + 3] * streamMask + copyMask * collideField[j + numberOfCells * 5];
+                    #else
+                    f5 = collideField[5 * numberOfCells + j + xlength[0] + 3];
+                    #endif
 
-                // load direction i = 9;
-                // c_9 = (0, 0, 0)
-                f9 = collideField[9 * numberOfCells + j];
-                density += f9;
+                    density += f5;
+                    velocity[0] -= f5;
+                    velocity[1] -= f5;
 
-                // load direction i = 10;
-                // c_10 = (1, 0, 0)
-                f10 = collideField[10 * numberOfCells + j - 1];
-                density += f10;
-                velocity[0] += f10;
+                    // load direction i = 6;
+                    // c_6 = (0, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f6 = collideField[6 * numberOfCells + j + xlength[0] + 2] * streamMask + copyMask * collideField[j + numberOfCells * 6];
+                    #else
+                    f6 = collideField[6 * numberOfCells + j + xlength[0] + 2];
+                    #endif
 
-                // load direction i = 11;
-                // c_11 = (-1, 1, 0)
-                f11 = collideField[11 * numberOfCells + j - xlength[0] - 1];
-                density += f11;
-                velocity[0] -= f11;
-                velocity[1] += f11;
+                    density += f6;
+                    velocity[1] -= f6;
 
-                // load direction i = 12;
-                // c_12 = (0, 1, 0)
-                f12 = collideField[12 * numberOfCells + j - xlength[0] - 2];
-                density += f12;
-                velocity[1] += f12;
+                    // load direction i = 7;
+                    // c_7 = (1, -1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f7 = collideField[7 * numberOfCells + j + xlength[0] + 1] * streamMask + copyMask * collideField[j + numberOfCells * 7];
+                    #else
+                    f7 = collideField[7 * numberOfCells + j + xlength[0] + 1];
+                    #endif
 
-                // load direction i = 13;
-                // c_13 = (1, 1, 0)
-                f13 = collideField[13 * numberOfCells + j - xlength[0] - 3];
-                density += f13;
-                velocity[0] += f13;
-                velocity[1] += f13;
+                    density += f7;
+                    velocity[0] += f7;
+                    velocity[1] -= f7;
 
-                // load direction i = 14;
-                // c_14 = (0, -1, 1)
-                f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)];
-                density += f14;
-                velocity[1] -= f14;
-                velocity[2] += f14;
+                    // load direction i = 8;
+                    // c_8 = (-1, 0, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f8 = collideField[8 * numberOfCells + j + 1] * streamMask + copyMask * collideField[j + numberOfCells * 8];
+                    #else
+                    f8 = collideField[8 * numberOfCells + j + 1];
+                    #endif
 
-                // load direction i = 15;
-                // c_15 = (-1, 0, 1)
-                f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1];
-                density += f15;
-                velocity[0] -= f15;
-                velocity[2] += f15;
+                    density += f8;
+                    velocity[0] -= f8;
 
-                // load direction i = 16;
-                // c_16 = (0, 0, 1)
-                f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)];
-                density += f16;
-                velocity[2] += f16;
+                    // load direction i = 9;
+                    // c_9 = (0, 0, 0)
+                    f9 = collideField[9 * numberOfCells + j];
+                    density += f9;
 
-                // load direction i = 17;
-                // c_17 = (1, 0, 1)
-                f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1];
-                density += f17;
-                velocity[0] += f17;
-                velocity[2] += f17;
+                    // load direction i = 10;
+                    // c_10 = (1, 0, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f10 = collideField[10 * numberOfCells + j - 1] * streamMask + copyMask * collideField[j + numberOfCells * 11];
+                    #else
+                    f10 = collideField[10 * numberOfCells + j - 1];
+                    #endif
 
-                // load direction i = 18;
-                // c_18 = (0, 1, 1)
-                f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)];
-                density += f18;
-                velocity[1] += f18;
-                velocity[2] += f18;
+                    density += f10;
+                    velocity[0] += f10;
+
+                    // load direction i = 11;
+                    // c_11 = (-1, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f11 = collideField[11 * numberOfCells + j - xlength[0] - 1] * streamMask + copyMask * collideField[j + numberOfCells * 11];
+                    #else
+                    f11 = collideField[11 * numberOfCells + j - xlength[0] - 1];
+                    #endif
+
+                    density += f11;
+                    velocity[0] -= f11;
+                    velocity[1] += f11;
+
+                    // load direction i = 12;
+                    // c_12 = (0, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f12 = collideField[12 * numberOfCells + j - xlength[0] - 2] * streamMask + copyMask * collideField[j + numberOfCells * 12];
+                    #else
+                    f12 = collideField[12 * numberOfCells + j - xlength[0] - 2];
+                    #endif
+
+                    density += f12;
+                    velocity[1] += f12;
+
+                    // load direction i = 13;
+                    // c_13 = (1, 1, 0)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f13 = collideField[13 * numberOfCells + j - xlength[0] - 3] * streamMask + copyMask * collideField[j + numberOfCells * 13];
+                    #else
+                    f13 = collideField[13 * numberOfCells + j - xlength[0] - 3];
+                    #endif
+
+                    density += f13;
+                    velocity[0] += f13;
+                    velocity[1] += f13;
+
+                    // load direction i = 14;
+                    // c_14 = (0, -1, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)] * streamMask + copyMask * collideField[j + numberOfCells * 14];
+                    #else
+                    f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)];
+                    #endif
+
+                    density += f14;
+                    velocity[1] -= f14;
+                    velocity[2] += f14;
+
+                    // load direction i = 15;
+                    // c_15 = (-1, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1] * streamMask + copyMask * collideField[j + numberOfCells * 15];
+                    #else
+                    f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1];
+                    #endif
+
+                    density += f15;
+                    velocity[0] -= f15;
+                    velocity[2] += f15;
+
+                    // load direction i = 16;
+                    // c_16 = (0, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)] * streamMask + copyMask * collideField[j + numberOfCells * 16];
+                    #else
+                    f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)];
+                    #endif
+
+                    density += f16;
+                    velocity[2] += f16;
+
+                    // load direction i = 17;
+                    // c_17 = (1, 0, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1] * streamMask + copyMask * collideField[j + numberOfCells * 17];
+                    #else
+                    f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1];
+                    #endif
+
+                    density += f17;
+                    velocity[0] += f17;
+                    velocity[2] += f17;
+
+                    // load direction i = 18;
+                    // c_18 = (0, 1, 1)
+                    #ifdef _ARBITRARYGEOMETRY_
+                    f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)] * streamMask + copyMask * collideField[j + numberOfCells * 18];
+                    #else
+                    f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)];
+                    #endif
+
+                    density += f18;
+                    velocity[1] += f18;
+                    velocity[2] += f18;
 
                 velocity[0] = velocity[0] / density;
                 velocity[1] = velocity[1] / density;
@@ -2482,7 +3517,7 @@ void doStreamingAndCollision(double *collideField, double *streamField,int *flag
     break;
     }
 }
-
+#ifdef _AVX_
 void doStreamingAndCollisionAVX(double *collideField, double *streamField,int *flagField,int *xlength, const double tau, int part)
 {
 
@@ -6894,4 +7929,4 @@ void doStreamingAndCollisionAVX(double *collideField, double *streamField,int *f
     }
 
 }
-
+#endif

@@ -11,6 +11,10 @@
 #define PARALLEL_BOUNDARY 7
 #include <stdint.h>
 
+//#define _AVX_
+//#define _ARBITRARYGEOMETRY_
+//#define _DEBUG_
+
 static const int VELOCITIESRIGHTOUT[5] = { 3, 7, 13, 17, 10 };
 static const int VELOCITIESLEFTOUT[5] = { 1, 5, 11, 15, 8 };
 static const int VELOCITIESBOTTOMOUT[5] = { 0, 5, 7, 14, 6 };

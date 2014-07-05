@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <omp.h>
 #include <sys/time.h>
+#include <papi.h>
 
 int main(int argc, char *argv[])
 {
@@ -23,6 +24,16 @@ int main(int argc, char *argv[])
     clock_t begin, end;
     double time_spent;
     struct timeval time_start, time_end;
+
+    long long counters[3];
+    int PAPI_events[] =
+    {
+        PAPI_TOT_CYC,
+        PAPI_L2_DCM,
+        PAPI_L2_DCA
+    };
+
+    PAPI_library_init(PAPI_VER_CURRENT);
 
     int xlength[3], local_xlength[3], timesteps, timestepsPerPlotting;
     double tau, bddParams[7];
@@ -38,7 +49,9 @@ int main(int argc, char *argv[])
     MPI_Datatype MPISendTypes[6], MPIRecvTypes[6];
     MPI_Request MPISendReq[2], MPIRecvReq[2];
 
+#ifdef _DEBUG_
     double * exactCollideField; // for debugging only
+#endif
 
 
 
@@ -75,24 +88,25 @@ int main(int argc, char *argv[])
 
         if (!rank)
             printf("Progress:     ");
+        PAPI_start_counters( PAPI_events, 3 );
         for(int t = 0; t < timesteps; t++)
         {
             double *swap = NULL;
 
 
             communicateBoundaryValues( MPISendTypes, MPIRecvTypes, collideField, neighbours, MPISendReq, MPIRecvReq, 0); // communicate along x - axis (right to left - left to right)
-            doStreamingAndCollisionAVX(collideField, streamField, flagField, local_xlength, tau, 1);
+            doStreamingAndCollision(collideField, streamField, flagField, local_xlength, tau, 1);
             checkRequestCompletion(MPISendReq, MPIRecvReq, 0, neighbours);
 
             communicateBoundaryValues( MPISendTypes, MPIRecvTypes, collideField, neighbours, MPISendReq, MPIRecvReq, 2); // communicate along z - axis (back to front - front to back)
-            doStreamingAndCollisionAVX(collideField, streamField, flagField, local_xlength, tau, 2);
+            doStreamingAndCollision(collideField, streamField, flagField, local_xlength, tau, 2);
             checkRequestCompletion(MPISendReq, MPIRecvReq, 2, neighbours);
 
             communicateBoundaryValues( MPISendTypes, MPIRecvTypes, collideField, neighbours, MPISendReq, MPIRecvReq, 1); // communicate along y - axis (bottom to top - top to bottom)
-            doStreamingAndCollisionAVX(collideField, streamField, flagField, local_xlength, tau, 3);
+            doStreamingAndCollision(collideField, streamField, flagField, local_xlength, tau, 3);
             checkRequestCompletion(MPISendReq, MPIRecvReq, 1, neighbours);
 
-            doStreamingAndCollisionAVX(collideField, streamField, flagField, local_xlength, tau, 4);
+            doStreamingAndCollision(collideField, streamField, flagField, local_xlength, tau, 4);
 
             swap = collideField;
             collideField = streamField;
@@ -111,43 +125,45 @@ int main(int argc, char *argv[])
             }
 
             /** debugging code: check collideField */
+#ifdef _DEBUG_
             // check correctness of collideField with reference data
-//            if (t % timestepsPerPlotting == 0)
-//            {
-//
-//                exactCollideField = (double*) malloc((size_t) sizeof(double) * PARAMQ * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2));
-//
-//                int x, y, z, i;
-//                FILE *fp = NULL;
-//                unsigned int line = 0;
-//                int error = 0;
-//                char szFileName[1200];
-//                sprintf( szFileName, "Testdata/%s/%i.dat", problem, t / timestepsPerPlotting );
-//                fp = fopen(szFileName,"r");
-//                if (fp != NULL)
-//                {
-//                    for (line = 0; line < PARAMQ * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2); line++)
-//                        fscanf(fp,"%lf",&exactCollideField[line]);
-//
-//                    for (z = 1; z <= local_xlength[2]; z++)
-//                        for (y = 1; y <= local_xlength[1]; y++)
-//                            for(x = 1; x <= local_xlength[0]; x++)
-//                                for (i = 0; i < PARAMQ; i++)
-//                                    if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FLUID)
-//                                       if (fabs(collideField[(z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + i * (local_xlength[0] + 2) * (local_xlength[1] + 2) * (local_xlength[2] + 2)] - exactCollideField[PARAMQ * ((z + kCoord * (xlength[2] / kProc)) * (xlength[0] + 2) * (xlength[1] + 2) + (y + jCoord * (xlength[1]/jProc)) * (xlength[0] + 2) + (x + iCoord * (xlength[0] / iProc) )) + i]) > 1e-4)
-//                                            error = 1;
-//                    if (error)
-//                        printf("ERROR: Process %d has a different collideField in timestep %d\n",rank, t);
-//
-//                    fclose(fp);
-//
-//                }
-//                else
-//                    printf("ERROR: Process %d cannot read file %s\n", rank, szFileName);
-//
-//                free(exactCollideField);
-//
-//            }
+            if (t % timestepsPerPlotting == 0)
+            {
+
+                exactCollideField = (double*) malloc((size_t) sizeof(double) * PARAMQ * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2));
+
+                int x, y, z, i;
+                FILE *fp = NULL;
+                unsigned int line = 0;
+                int error = 0;
+                char szFileName[1200];
+                sprintf( szFileName, "Testdata/%s/%i.dat", problem, t / timestepsPerPlotting );
+                fp = fopen(szFileName,"r");
+                if (fp != NULL)
+                {
+                    for (line = 0; line < PARAMQ * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2); line++)
+                        fscanf(fp,"%lf",&exactCollideField[line]);
+
+                    for (z = 1; z <= local_xlength[2]; z++)
+                        for (y = 1; y <= local_xlength[1]; y++)
+                            for(x = 1; x <= local_xlength[0]; x++)
+                                for (i = 0; i < PARAMQ; i++)
+                                    if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FLUID)
+                                        if (fabs(collideField[(z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + i * (local_xlength[0] + 2) * (local_xlength[1] + 2) * (local_xlength[2] + 2)] - exactCollideField[PARAMQ * ((z + kCoord * (xlength[2] / kProc)) * (xlength[0] + 2) * (xlength[1] + 2) + (y + jCoord * (xlength[1]/jProc)) * (xlength[0] + 2) + (x + iCoord * (xlength[0] / iProc) )) + i]) > 1e-4)
+                                            error = 1;
+                    if (error)
+                        printf("ERROR: Process %d has a different collideField in timestep %d\n",rank, t);
+
+                    fclose(fp);
+
+                }
+                else
+                    printf("ERROR: Process %d cannot read file %s\n", rank, szFileName);
+
+                free(exactCollideField);
+
+            }
+#endif
             /** end of debugging code */
 
 
@@ -155,6 +171,7 @@ int main(int argc, char *argv[])
         MPI_Barrier(MPI_COMM_WORLD);
         if (!rank)
         {
+            PAPI_read_counters( counters, 3 );
             printf("\b\b\b\b100%%\n");
             end = clock();
             time_spent = (double) (end - begin) / CLOCKS_PER_SEC;
@@ -163,6 +180,11 @@ int main(int argc, char *argv[])
             printf("Running time (CPU time): %.2fs\n", time_spent);
             printf("Running time (Wall clock): %.2fs\n", ( (double) (( time_end.tv_sec - time_start.tv_sec) * 1000000u + time_end.tv_usec - time_start.tv_usec) )/ 1e6);
             printf("MLUPS: %.3f\n", ((double) (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2) * timesteps) / (1000000.0 * ((time_end.tv_sec - time_start.tv_sec) * 1000000u + time_end.tv_usec - time_start.tv_usec) / 1e6));
+
+            printf("%lld L2 cache misses (%.3lf%% misses) in %lld cycles\n",
+                   counters[1],
+                   (double)counters[1] / (double)counters[2] * 100,
+                   counters[0] );
         }
 
         free(collideField);

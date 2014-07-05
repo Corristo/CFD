@@ -1,6 +1,7 @@
 #include "initLB.h"
 #include "LBDefinitions.h"
 #include "communication.h"
+#include <omp.h>
 
 int readParameters( int *xlength, double *tau, double *bddParams, int *iProc, int *jProc, int *kProc,  int *timesteps, int *timestepsPerPlotting, char *problem, char *pgmInput, int argc, char *argv[] )
 {
@@ -86,107 +87,116 @@ int readParameters( int *xlength, double *tau, double *bddParams, int *iProc, in
 void initialiseFields( double *collideField, double *streamField, int *flagField, int * xlength, int *local_xlength, char *problem, char* pgmInput, int rank, int iProc, int jProc, int kProc )
 {
     int i, j, k, x, y, z;
-
+    computePosition(iProc, jProc, kProc, &i, &j, &k);
+    #pragma omp parallel private(x, y, z), firstprivate(i,j,k) shared(collideField, flagField, streamField, xlength, problem, pgmInput, local_xlength, rank, iProc, jProc, kProc)
+    {
+    #pragma omp for  schedule(static)
     for (i = 0; i < PARAMQ; i++)
         for (j = 0; j < (local_xlength[0] + 2) * (local_xlength[1] + 2) * (local_xlength[2] + 2); j++)
             collideField[j + i * (local_xlength[0] + 2) * (local_xlength[1] + 2) * (local_xlength[2] + 2)] = streamField[j + i * (local_xlength[0] + 2) * (local_xlength[1] + 2) * (local_xlength[2] + 2)] = LATTICEWEIGHTS[i];
 
+    #pragma omp for schedule(static)
     for (i = 0; i < (local_xlength[0] + 2) * (local_xlength[1] + 2) * (local_xlength[2] + 2); i++)
         flagField[i] = FLUID;
 
 
     // independend of the problem first initialize all ghost cells as PARALLEL_BOUNDARY
-    {
+
         /* top boundary */
-        y = local_xlength[1] + 1;
+        #pragma omp for schedule(static)
         for (z = 0; z <= local_xlength[2] + 1; z++)
             for (x = 0; x <= local_xlength[0] + 1; x++)
-                flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] = PARALLEL_BOUNDARY;
+                flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + (local_xlength[1] + 1) * (local_xlength[0] + 2) + x] = PARALLEL_BOUNDARY;
 
 
         /* back boundary */
-        z = 0;
+        #pragma omp for schedule(static)
         for (y = 0; y <= local_xlength[1] + 1; y++)
             for (x = 0; x <= local_xlength[0] + 1; x++)
-                flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] = PARALLEL_BOUNDARY;
+                flagField[y * (local_xlength[0] + 2) + x] = PARALLEL_BOUNDARY;
 
         /* bottom boundary */
-        y = 0;
+        #pragma omp for schedule(static)
         for (z = 0; z <= local_xlength[2] + 1; z++)
             for (x = 0; x <= local_xlength[0] + 1; x++)
-                flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] = PARALLEL_BOUNDARY;
+                flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + x] = PARALLEL_BOUNDARY;
 
         /* left boundary */
-        x = 0;
+        #pragma omp for schedule(static)
         for (z = 0; z <= local_xlength[2] + 1; z++)
             for (y = 0; y <= local_xlength[1] + 1; y++)
-                flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] = PARALLEL_BOUNDARY;
+                flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2)] = PARALLEL_BOUNDARY;
 
         /* right boundary */
-        x = local_xlength[0] + 1;
+        #pragma omp for schedule(static)
         for (z = 0; z <= local_xlength[2] + 1; z++)
             for (y = 0; y <= local_xlength[1] + 1; y++)
-                flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] = PARALLEL_BOUNDARY;
+                flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + local_xlength[0] + 1] = PARALLEL_BOUNDARY;
 
         /* front boundary, i.e. z = local_xlength + 1 */
-        z = local_xlength[2] + 1;
+        #pragma omp for schedule(static)
         for (y = 0; y <= local_xlength[1] + 1; y++)
             for (x = 0; x <= local_xlength[0] + 1; x++)
-                flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] = PARALLEL_BOUNDARY;
+                flagField[(local_xlength[2] + 1) * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] = PARALLEL_BOUNDARY;
     }
 
     /** initialization of different scenarios */
     // only the drivenCavity scenario is adjusted for the parallelized version
 
-    i = rank % iProc;
-    j = ((rank - i) / iProc) % jProc;
-    k = (rank - i - iProc * j) / (iProc * jProc);
+
 
     if (!strcmp(problem, "drivenCavity"))
     {
         /* back boundary */
-        z = 0;
         if (k == 0)
+        {
+            #pragma omp parallel for private(x, y, z), firstprivate(i,j,k) shared(collideField, flagField, streamField, xlength, problem, pgmInput, local_xlength, rank, iProc, jProc, kProc) schedule(static)
             for (y = 0; y <= local_xlength[1] + 1; y++)
                 for (x = 0; x <= local_xlength[0] + 1; x++)
-
-                    flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] = NO_SLIP;
-
+                    flagField[y * (local_xlength[0] + 2) + x] = NO_SLIP;
+        }
         /* bottom boundary */
-        y = 0;
         if (j == 0)
+        {
+            #pragma omp parallel for private(x, y, z), firstprivate(i,j,k) shared(collideField, flagField, streamField, xlength, problem, pgmInput, local_xlength, rank, iProc, jProc, kProc) schedule(static)
             for (z = 0; z <= local_xlength[2] + 1; z++)
                 for (x = 0; x <= local_xlength[0] + 1; x++)
 
-                    flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] = NO_SLIP;
-
+                    flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + x] = NO_SLIP;
+        }
         /* left boundary */
-        x = 0;
         if (i == 0)
+        {
+            #pragma omp parallel for private(x, y, z), firstprivate(i,j,k) shared(collideField, flagField, streamField, xlength, problem, pgmInput, local_xlength, rank, iProc, jProc, kProc) schedule(static)
             for (z = 0; z <= local_xlength[2] + 1; z++)
                 for (y = 0; y <= local_xlength[1] + 1; y++)
-                    flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] = NO_SLIP;
-
+                    flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2)] = NO_SLIP;
+        }
         /* right boundary */
-        x = local_xlength[0] + 1;
         if (i == iProc - 1)
+        {
+            #pragma omp parallel for private(x, y, z), firstprivate(i,j,k) shared(collideField, flagField, streamField, xlength, problem, pgmInput, local_xlength, rank, iProc, jProc, kProc) schedule(static)
             for (z = 0; z <= local_xlength[2] + 1; z++)
                 for (y = 0; y <= local_xlength[1] + 1; y++)
-                    flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] = NO_SLIP;
-
+                    flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + local_xlength[0] + 1] = NO_SLIP;
+        }
         /* front boundary, i.e. z = local_xlength + 1 */
-        z = local_xlength[2] + 1;
         if (k == kProc - 1)
+        {
+            #pragma omp parallel for private(x, y, z), firstprivate(i,j,k) shared(collideField, flagField, streamField, xlength, problem, pgmInput, local_xlength, rank, iProc, jProc, kProc) schedule(static)
             for (y = 0; y <= local_xlength[1] + 1; y++)
                 for (x = 0; x <= local_xlength[0] + 1; x++)
-                    flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] = NO_SLIP;
-
+                    flagField[(local_xlength[2] + 1) * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] = NO_SLIP;
+        }
         /* top boundary */
-        y = local_xlength[1] + 1;
         if (j == jProc - 1)
+        {
+            #pragma omp parallel for private(x, y, z), firstprivate(i,j,k) shared(collideField, flagField, streamField, xlength, problem, pgmInput, local_xlength, rank, iProc, jProc, kProc) schedule(static)
             for (z = 0; z <= local_xlength[2] + 1; z++)
                 for (x = 0; x <= local_xlength[0] + 1; x++)
-                    flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] = MOVING_WALL;
+                    flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + (local_xlength[1] + 1) * (local_xlength[0] + 2) + x] = MOVING_WALL;
+        }
+
     }
     if (!strcmp(problem, "tiltedPlate"))
     {
