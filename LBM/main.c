@@ -10,6 +10,8 @@
 #include <time.h>
 #include <unistd.h>
 #include <papi.h>
+#include <sys/time.h>
+
 
 int main(int argc, char *argv[])
 {
@@ -23,6 +25,7 @@ int main(int argc, char *argv[])
     int *flagField = NULL;
     clock_t begin, end;
     double time_spent;
+    struct timeval time_start, time_end;
 
     int xlength[3], timesteps, timestepsPerPlotting;
     double tau, bddParams[7];
@@ -41,6 +44,7 @@ int main(int argc, char *argv[])
     if(readParameters(xlength, &tau, bddParams, &timesteps, &timestepsPerPlotting, problem, pgmInput, argc, argv) == 0)
     {
         begin = clock();
+        gettimeofday(&time_start, NULL);
         collideField = (double*) malloc((size_t) sizeof(double) * PARAMQ * (xlength[0] + 2)*(xlength[1] + 2)*(xlength[2] + 2));
         streamField = (double*) malloc((size_t) sizeof(double) * PARAMQ * (xlength[0] + 2)*(xlength[1] + 2)*(xlength[2] + 2));
         flagField = (int *) malloc((size_t) sizeof (int) * (xlength[0] + 2)*(xlength[1] + 2)*(xlength[2] + 2));
@@ -69,7 +73,7 @@ int main(int argc, char *argv[])
 
 //            doStreamingAVX(collideField, streamField, flagField, xlength);
 //            doStreamingAVXv2(collideField, streamField, flagField, xlength, densities, velocities);
-            doStreamingAndCollisionAVX(collideField, streamField, flagField, xlength, tau);
+            doStreamingAndCollision(collideField, streamField, flagField, xlength, tau);
             swap = collideField;
             collideField = streamField;
             streamField = swap;
@@ -133,10 +137,12 @@ int main(int argc, char *argv[])
         }
         printf("\b\b\b\b100%%\n");
         end = clock();
+        gettimeofday(&time_end, NULL);
         time_spent = (double) (end - begin) / CLOCKS_PER_SEC;
 
-        printf("Running time: %.2f\n", time_spent);
-        printf("MLUPS: %.3f\n", ((double) (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2) * timesteps) / (1000000.0 * time_spent));
+        printf("Running time: %.2fs\n", time_spent);
+        printf("Running time (Wall clock): %.2fs\n", ( (double) (( time_end.tv_sec - time_start.tv_sec) * 1000000u + time_end.tv_usec - time_start.tv_usec) )/ 1e6);
+        printf("MLUPS: %.3f\n", ((double) (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2) * timesteps) / (1000000.0 * ((time_end.tv_sec - time_start.tv_sec) * 1000000u + time_end.tv_usec - time_start.tv_usec) / 1e6));
 
 
         printf("%lld L2 cache misses (%.3lf%% misses) in %lld cycles\n",
