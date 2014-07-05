@@ -11,6 +11,11 @@
 #define PARALLEL_BOUNDARY 7
 #include <stdint.h>
 
+
+//#define _ARBITRARYGEOMETRIES_       // enables the support of arbitrary geometries inside the computational domain
+//#define _AVX_                       // enables the use of AVX2 intrinsics
+//#define DEBUG
+
 static const int VELOCITIESRIGHTOUT[5] = { 3, 7, 13, 17, 10 };
 static const int VELOCITIESLEFTOUT[5] = { 1, 5, 11, 15, 8 };
 static const int VELOCITIESBOTTOMOUT[5] = { 0, 5, 7, 14, 6 };

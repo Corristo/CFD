@@ -82,65 +82,59 @@ int readParameters(int *xlength, double *tau, double *bddParams, int *timesteps,
 void initialiseFields(double *collideField, double *streamField, int *flagField, int *xlength, char *problem, char* pgmInput)
 {
     int i, j, x, y, z;
-    #pragma omp parallel default(none), private(i,j, x, y, z, pgmInput), shared(collideField, streamField, flagField, xlength, problem)
-    {
-    #pragma omp for nowait schedule(static)
+
+
+    #pragma omp parallel for default(none), private(i, j, x, y, z, pgmInput), shared(collideField, streamField, flagField, xlength, problem) schedule(static)
     for (i = 0; i < PARAMQ; i++)
         for (j = 0; j < (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2); j++)
             collideField[j + i * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2)] = streamField[j+ i * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2)] = LATTICEWEIGHTS[i];
-    #pragma omp for nowait schedule(static)
+    #pragma omp parallel for default(none), private(i, j, x, y, z, pgmInput), shared(collideField, streamField, flagField, xlength, problem) schedule(static)
     for (i = 0; i < (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2); i++)
         flagField[i] = FLUID;
 
     if (!strcmp(problem, "drivenCavity"))
     {
         /* back boundary */
-        z = 0;
-        #pragma omp for nowait schedule(static)
+        #pragma omp parallel for default(none), private(i,j, x, y, z, pgmInput), shared(collideField, streamField, flagField, xlength, problem) schedule(static)
         for (y = 0; y <= xlength[1] + 1; y++)
             for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+                flagField[y * (xlength[0] + 2) + x] = NO_SLIP;
 
         /* bottom boundary */
-        y = 0;
-        #pragma omp for nowait schedule(static)
+        #pragma omp parallel for default(none), private(i,j, x, y, z, pgmInput), shared(collideField, streamField, flagField, xlength, problem) schedule(static)
         for (z = 0; z <= xlength[2] + 1; z++)
             for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + x] = NO_SLIP;
 
         /* left boundary */
-        x = 0;
-        #pragma omp for nowait schedule(static)
+        #pragma omp parallel for default(none), private(i,j, x, y, z, pgmInput), shared(collideField, streamField, flagField, xlength, problem) schedule(static)
         for (z = 0; z <= xlength[2] + 1; z++)
             for (y = 0; y <= xlength[1] + 1; y++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2)] = NO_SLIP;
 
         /* right boundary */
-        x = xlength[0] + 1;
-        #pragma omp for nowait schedule(static)
+        #pragma omp parallel for default(none), private(i,j, x, y, z, pgmInput), shared(collideField, streamField, flagField, xlength, problem) schedule(static)
         for (z = 0; z <= xlength[2] + 1; z++)
             for (y = 0; y <= xlength[1] + 1; y++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + xlength[0] + 1] = NO_SLIP;
 
         /* front boundary, i.e. z = xlength + 1 */
-        z = xlength[2] + 1;
-        #pragma omp for nowait schedule(static)
+        #pragma omp parallel for default(none), private(i,j, x, y, z, pgmInput), shared(collideField, streamField, flagField, xlength, problem) schedule(static)
         for (y = 0; y <= xlength[1] + 1; y++)
             for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+                flagField[(xlength[2] + 1) * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
 
         /* top boundary */
-        y = xlength[1] + 1;
-        #pragma omp for nowait schedule(static)
+        #pragma omp parallel for default(none), private(i,j, x, y, z, pgmInput), shared(collideField, streamField, flagField, xlength, problem) schedule(static)
         for (z = 0; z <= xlength[2] + 1; z++)
             for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = MOVING_WALL;
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x] = MOVING_WALL;
     }
     if (!strcmp(problem, "tiltedPlate"))
     {
         int** pgmImage;
         pgmImage = read_pgm(pgmInput);
-        #pragma omp for nowait schedule(static)
+        #pragma omp parallel for default(none), private(i,j, x, y, z, pgmInput), shared(collideField, streamField, flagField, xlength, problem, pgmImage) schedule(static)
         for (z = 1; z <= xlength[2]; z++)
             for (y = 1; y <= xlength[1]; y++)
                 for (x = 1; x <= xlength[0]; x++)
@@ -148,106 +142,92 @@ void initialiseFields(double *collideField, double *streamField, int *flagField,
         free_imatrix(pgmImage, 0, xlength[0] + 2, 0, xlength[1] + 2);
 
         /* front boundary, i.e. z = xlength + 1 */
-        z = xlength[2] + 1;
-        #pragma omp for nowait schedule(static)
+        #pragma omp parallel for default(none), private(i,j, x, y, z, pgmInput), shared(collideField, streamField, flagField, xlength, problem) schedule(static)
         for (y = 0; y <= xlength[1] + 1; y++)
             for (x = 0; x <= xlength[0] + 1; x++)
-                if (flagField[(z - 1) * (xlength[0] + 2) * (xlength[1] + 2) + (xlength[0] + 2) * y + x] == NO_SLIP)
-                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+                if (flagField[xlength[2] * (xlength[0] + 2) * (xlength[1] + 2) + (xlength[0] + 2) * y + x] == NO_SLIP)
+                    flagField[(xlength[2] + 1) * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
                 else
-                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = FREE_SLIP;
+                    flagField[(xlength[2] + 1) * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = FREE_SLIP;
 
         /* back boundary */
-        z = 0;
-        #pragma omp for nowait schedule(static)
+        #pragma omp parallel for default(none), private(i,j, x, y, z, pgmInput), shared(collideField, streamField, flagField, xlength, problem) schedule(static)
         for (y = 0; y <= xlength[1] + 1; y++)
             for (x = 0; x <= xlength[0] + 1; x++)
-                if (flagField[(z + 1) * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] == NO_SLIP)
-                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+                if (flagField[y * (xlength[0] + 2) + x] == NO_SLIP)
+                    flagField[y * (xlength[0] + 2) + x] = NO_SLIP;
                 else
-                    flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = FREE_SLIP;
+                    flagField[y * (xlength[0] + 2) + x] = FREE_SLIP;
 
 
         /* left boundary */
-        x = 0;
-        #pragma omp for nowait schedule(static)
+        #pragma omp parallel for default(none), private(i,j, x, y, z, pgmInput), shared(collideField, streamField, flagField, xlength, problem) schedule(static)
         for (z = 0; z <= xlength[2] + 1; z++)
             for (y = 0; y <= xlength[1] + 1; y++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = INFLOW;
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2)] = INFLOW;
 
         /* right boundary */
-        x = xlength[0] + 1;
-        #pragma omp for nowait schedule(static)
+        #pragma omp parallel for default(none), private(i,j, x, y, z, pgmInput), shared(collideField, streamField, flagField, xlength, problem) schedule(static)
         for (z = 0; z <= xlength[2] + 1; z++)
             for (y = 0; y <= xlength[1] + 1; y++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = OUTFLOW;
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + xlength[0] + 1] = OUTFLOW;
 
 
         /* top boundary */
-        y = xlength[1] + 1;
-        #pragma omp for nowait schedule(static)
+        #pragma omp parallel for default(none), private(i,j, x, y, z, pgmInput), shared(collideField, streamField, flagField, xlength, problem) schedule(static)
         for (z = 0; z <= xlength[2] + 1; z++)
             for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x] = NO_SLIP;
 
         /* bottom boundary */
-        y = 0;
-        #pragma omp for nowait schedule(static)
+        #pragma omp parallel for default(none), private(i,j, x, y, z, pgmInput), shared(collideField, streamField, flagField, xlength, problem) schedule(static)
         for (z = 0; z <= xlength[2] + 1; z++)
             for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + x] = NO_SLIP;
 
     }
     if (!strcmp(problem, "flowStep"))
     {
-
-
         /* front boundary, i.e. z = xlength + 1 */
-        z = xlength[2] + 1;
-        #pragma omp for nowait schedule(static)
+        #pragma omp parallel for default(none), private(i,j, x, y, z, pgmInput), shared(collideField, streamField, flagField, xlength, problem) schedule(static)
         for (y = 0; y <= xlength[1] + 1; y++)
             for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+                flagField[(xlength[2] + 1) * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
 
         /* back boundary */
-        z = 0;
-        #pragma omp for nowait schedule(static)
+        #pragma omp parallel for default(none), private(i,j, x, y, z, pgmInput), shared(collideField, streamField, flagField, xlength, problem) schedule(static)
         for (y = 0; y <= xlength[1] + 1; y++)
             for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+                flagField[y * (xlength[0] + 2) + x] = NO_SLIP;
 
         /* left boundary */
-        x = 0;
-        #pragma omp for nowait schedule(static)
+        #pragma omp parallel for default(none), private(i,j, x, y, z, pgmInput), shared(collideField, streamField, flagField, xlength, problem) schedule(static)
         for (z = 0; z <= xlength[2] + 1; z++)
             for (y = 0; y <= xlength[1] + 1; y++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = INFLOW;
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2)] = INFLOW;
 
         /* right boundary */
-        x = xlength[0] + 1;
-        #pragma omp for nowait schedule(static)
+        #pragma omp parallel for default(none), private(i,j, x, y, z, pgmInput), shared(collideField, streamField, flagField, xlength, problem) schedule(static)
         for (z = 0; z <= xlength[2] + 1; z++)
             for (y = 0; y <= xlength[1] + 1; y++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = OUTFLOW;
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + xlength[0] + 1] = OUTFLOW;
 
 
         /* top boundary */
-        y = xlength[1] + 1;
-        #pragma omp for nowait schedule(static)
+        #pragma omp parallel for default(none), private(i,j, x, y, z, pgmInput), shared(collideField, streamField, flagField, xlength, problem) schedule(static)
         for (z = 0; z <= xlength[2] + 1; z++)
             for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x] = NO_SLIP;
 
         /* bottom boundary */
-        y = 0;
-        #pragma omp for nowait schedule(static)
+        #pragma omp parallel for default(none), private(i,j, x, y, z, pgmInput), shared(collideField, streamField, flagField, xlength, problem) schedule(static)
         for (z = 0; z <= xlength[2] + 1; z++)
             for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + x] = NO_SLIP;
 
 
         /* step */
-        #pragma omp for nowait schedule(static)
+        #pragma omp parallel for default(none), private(i,j, x, y, z, pgmInput), shared(collideField, streamField, flagField, xlength, problem) schedule(static)
         for (z = 0; z <= xlength[2] + 1; z++)
             for (y = 1; y <= xlength[1]/2; y++) /* integer division on purpose, half of the channel is blocked by step */
                 for (x = 1; x <= xlength[1]/2; x++)
@@ -258,50 +238,44 @@ void initialiseFields(double *collideField, double *streamField, int *flagField,
     {
 
         /* front boundary, i.e. z = xlength + 1 */
-        z = xlength[2] + 1;
-        #pragma omp for nowait schedule(static)
+        #pragma omp parallel for default(none), private(i,j, x, y, z, pgmInput), shared(collideField, streamField, flagField, xlength, problem) schedule(static)
         for (y = 0; y <= xlength[1] + 1; y++)
             for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = FREE_SLIP;
+                flagField[(xlength[2] + 1) * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = FREE_SLIP;
 
         /* back boundary */
-        z = 0;
-        #pragma omp for nowait schedule(static)
+        #pragma omp parallel for default(none), private(i,j, x, y, z, pgmInput), shared(collideField, streamField, flagField, xlength, problem) schedule(static)
         for (y = 0; y <= xlength[1] + 1; y++)
             for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = FREE_SLIP;
+                flagField[y * (xlength[0] + 2) + x] = FREE_SLIP;
 
 
 
         /* left boundary */
-        x = 0;
-        #pragma omp for nowait schedule(static)
+        #pragma omp parallel for default(none), private(i,j, x, y, z, pgmInput), shared(collideField, streamField, flagField, xlength, problem) schedule(static)
         for (z = 0; z <= xlength[2] + 1; z++)
             for (y = 0; y <= xlength[1] + 1; y++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = PRESSURE_IN;
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2)] = PRESSURE_IN;
 
         /* right boundary */
-        x = xlength[0] + 1;
-        #pragma omp for nowait schedule(static)
+        #pragma omp parallel for default(none), private(i,j, x, y, z, pgmInput), shared(collideField, streamField, flagField, xlength, problem) schedule(static)
         for (z = 0; z <= xlength[2] + 1; z++)
             for (y = 0; y <= xlength[1] + 1; y++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = OUTFLOW;
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + xlength[0] + 1] = OUTFLOW;
 
 
         /* top boundary */
-        y = xlength[1] + 1;
-        #pragma omp for nowait schedule(static)
+        #pragma omp parallel for default(none), private(i,j, x, y, z, pgmInput), shared(collideField, streamField, flagField, xlength, problem) schedule(static)
         for (z = 0; z <= xlength[2] + 1; z++)
             for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x] = NO_SLIP;
 
         /* bottom boundary */
-        y = 0;
-        #pragma omp for nowait schedule(static)
+        #pragma omp parallel for default(none), private(i,j, x, y, z, pgmInput), shared(collideField, streamField, flagField, xlength, problem) schedule(static)
         for (z = 0; z <= xlength[2] + 1; z++)
             for (x = 0; x <= xlength[0] + 1; x++)
-                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x] = NO_SLIP;
-    }
+                flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + x] = NO_SLIP;
+
     }
     /** debugging code: checking the flagField */
 //    int * exactFlagField;

@@ -15,27 +15,25 @@
 
 void treatBoundary(double *collideField, int* flagField, const double * const bddParams, int *xlength)
 {
-    int i, x, y, z, neighbourCoordX, neighbourCoordY, neighbourCoordZ, currentCellIndex, neighbourCellIndex;
+    int i, x, y, z;
+    #ifdef _ARBITRARYGEOMETRIES_
+    int neighbourCoordX, neighbourCoordY, neighbourCoordZ, currentCellIndex, neighbourCellIndex;
+    #endif // _ARBITRARYGEOMETRIES
     int coordinate[3];
     int freeSlipNeighbours[3];
     double referenceDensity = 1.0;
     double inflowFeq[PARAMQ] __attribute__((aligned(32)));
-    computeFeqAVX(&referenceDensity, bddParams, inflowFeq);
+    computeFeq(&referenceDensity, bddParams, inflowFeq);
 
-    /* top boundary
-     * only need to set directions 0, 5, 6, 7, 14 */
-//    y = coordinate[1] = xlength[1] + 1;
-//    freeSlipNeighbours[1] = xlength[1];
-//    for (z = 0; z <= xlength[2] + 1; z++)
-//        for (x = 0; x <= xlength[0] + 1; x++)
-//        {
-//            coordinate[0] = freeSlipNeighbours[0] = x;
-//            coordinate[2] = freeSlipNeighbours[2] = z;
-//            compute_boundary(collideField, bddParams, flagField, xlength, VELOCITIESBOTTOMOUT, coordinate, freeSlipNeighbours, VELOCITIESTOPOUT, inflowFeq);
-//        }
-
+    #ifdef _ARBITRARYGEOMETRIES_
+    #pragma omp parallel default(none), private(x, y, z, i, coordinate, freeSlipNeighbours, neighbourCoordX, neighbourCoordY, neighbourCoordZ, currentCellIndex, neighbourCellIndex), firstprivate(inflowFeq, referenceDensity), shared(collideField, flagField, xlength)
+    #else
+    #pragma omp parallel default(none), private(x, y, z, i, coordinate, freeSlipNeighbours), firstprivate(inflowFeq, referenceDensity), shared(collideField, flagField, xlength)
+    #endif // _ARBITRARYGEOMETRIES_
+    {
     y = coordinate[1] = xlength[1] + 1;
     freeSlipNeighbours[1] = xlength[1];
+    #pragma omp for schedule(static)
     for (i = 0; i < 5; i++)
         for (z = 0; z <= xlength[2] + 1; z++)
             for (x = 0; x <= xlength[0] + 1; x++)
@@ -49,6 +47,7 @@ void treatBoundary(double *collideField, int* flagField, const double * const bd
     // i = 14,15,16,17,18
     z = coordinate[2] = 0;
     freeSlipNeighbours[2] = 1;
+   #pragma omp for nowait schedule(static)
     for (i = 0; i < 5; i++)
         for (y = 0; y <= xlength[1] + 1; y++)
             for (x = 0; x <= xlength[0] + 1; x++)
@@ -64,6 +63,7 @@ void treatBoundary(double *collideField, int* flagField, const double * const bd
     // i = 4, 11, 12, 13, 18
     y = coordinate[1] = 0;
     freeSlipNeighbours[1] = 1;
+    #pragma omp for nowait schedule(static)
     for (i = 0; i < 5; i++)
         for (z = 0; z <= xlength[2] + 1; z++)
             for (x = 0; x <= xlength[0] + 1; x++)
@@ -77,6 +77,7 @@ void treatBoundary(double *collideField, int* flagField, const double * const bd
     // i = 3, 7 ,10, 13, 17
     coordinate[0] = x = 0;
     freeSlipNeighbours[0] = 1;
+    #pragma omp for nowait schedule(static)
     for (i = 0; i < 5; i++)
         for (z = 0; z <= xlength[2] + 1; z++)
             for (y = 0; y <= xlength[1] + 1; y++)
@@ -90,6 +91,7 @@ void treatBoundary(double *collideField, int* flagField, const double * const bd
     // i = 1,5,8,11,15
     coordinate[0] = x = xlength[0] + 1;
     freeSlipNeighbours[0] = xlength[0];
+   #pragma omp for nowait schedule(static)
     for (i = 0; i < 5; i++)
         for (z = 0; z <= xlength[2] + 1; z++)
             for (y = 0; y <= xlength[1] + 1; y++)
@@ -103,6 +105,7 @@ void treatBoundary(double *collideField, int* flagField, const double * const bd
     // i=0,1,2,3,4
     z = coordinate[2] = xlength[2] + 1;
     freeSlipNeighbours[2] = xlength[2];
+    #pragma omp for nowait schedule(static)
     for (i = 0; i < 5; i++)
         for (y = 0; y <= xlength[1] + 1; y++)
             for (x = 0; x <= xlength[0] + 1; x++)
@@ -112,25 +115,29 @@ void treatBoundary(double *collideField, int* flagField, const double * const bd
                 compute_boundary(collideField, bddParams, flagField, xlength, VELOCITIESBACKOUT[i], coordinate, freeSlipNeighbours, VELOCITIESFRONTOUT[i], inflowFeq);
             }
 
+    #ifdef _ARBITRARYGEOMETRIES_
     /* inner boundary cells
      * assumes inner boundary cells can only be NO_SLIP */
-//    for (i = 0; i < PARAMQ; i++)
-//        for (z = 1; z <= xlength[2]; z++)
-//            for (y = 1; y <= xlength[1]; y++)
-//                for(x = 1; x <= xlength[0]; x++)
-//                    if (flagField[x + (xlength[0] + 2) * y + (xlength[0] + 2) * (xlength[1] + 2) * z])
-//                    {
-//                        neighbourCoordX = x + LATTICEVELOCITIES[i][0];
-//                        neighbourCoordY = y + LATTICEVELOCITIES[i][1];
-//                        neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
-//                        if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
-//                            if (!flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ])
-//                            {
-//                                currentCellIndex = z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x + i * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
-//                                neighbourCellIndex = neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX + (PARAMQ - 1 - i) * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
-//                                collideField[currentCellIndex] = collideField[neighbourCellIndex];
-//                            }
-//                    }
+    #pragma omp for nowait schedule(static)
+    for (i = 0; i < PARAMQ; i++)
+        for (z = 1; z <= xlength[2]; z++)
+            for (y = 1; y <= xlength[1]; y++)
+                for(x = 1; x <= xlength[0]; x++)
+                    if (flagField[x + (xlength[0] + 2) * y + (xlength[0] + 2) * (xlength[1] + 2) * z])
+                    {
+                        neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                        neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                        neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                        if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                            if (!flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ])
+                            {
+                                currentCellIndex = z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x + i * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
+                                neighbourCellIndex = neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX + (PARAMQ - 1 - i) * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
+                                collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                            }
+                    }
+    #endif // _ARBITRARYGEOMETRIES_
+}
 }
 
 /** boundary helper function */
@@ -206,7 +213,7 @@ void compute_boundary(double *collideField, const double * const bddParams, int 
             neighbourCellIndex = (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - directionToUpdate) * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
             computeDensity(collideField + (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2));
             computeVelocity(collideField + (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity, (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2));
-            computeFeqAVX(&referenceDensity, velocity, feq);
+            computeFeq(&referenceDensity, velocity, feq);
             collideField[currentCellIndex] = feq[PARAMQ - directionToUpdate - 1] + feq[directionToUpdate] - collideField[neighbourCellIndex];
         }
         break;
@@ -223,7 +230,7 @@ void compute_boundary(double *collideField, const double * const bddParams, int 
             computeDensity(collideField +  (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2));
             computeVelocity(collideField +  (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity, (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2));
             density = referenceDensity + pressureIn;
-            computeFeqAVX(&density, velocity, feq);
+            computeFeq(&density, velocity, feq);
             collideField[currentCellIndex] = feq[PARAMQ - directionToUpdate - 1] + feq[directionToUpdate] - collideField[neighbourCellIndex];
         }
         break;

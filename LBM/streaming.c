@@ -1,7 +1,9 @@
 #include "streaming.h"
 #include "LBDefinitions.h"
 #include "helper.h"
+#ifdef _AVX_
 #include <immintrin.h>
+#endif // _AVX_
 #include <omp.h>
 
 void doStreamingAndCollision(double *collideField, double *streamField,int *flagField,int *xlength, const double tau)
@@ -10,12 +12,17 @@ void doStreamingAndCollision(double *collideField, double *streamField,int *flag
     double f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18;
     double density, velocity[3];
     double tmpFeq0, tmpFeq1, tmpFeq2, dotProduct;
+    #ifdef _ARBITRARYGEOMETRIES_
+    int streamMask, copyMask;
+    #endif // _ARBITRARYGEOMETRIES_
 
     // Philip Neumann approach
     int numberOfCells = (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
-
-
+    #ifdef _ARBITRARYGEOMETRIES_
+    #pragma omp parallel for default(none), private(streamMask, copyMask, f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, density, velocity, tmpFeq0, tmpFeq1, tmpFeq2, dotProduct, x, y, j), firstprivate(numberOfCells, tau), shared(flagField, xlength, streamField, collideField) schedule(static)
+    #else
     #pragma omp parallel for default(none), private(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, density, velocity, tmpFeq0, tmpFeq1, tmpFeq2, dotProduct, x, y, j), firstprivate(numberOfCells, tau), shared(xlength, streamField, collideField) schedule(static)
+    #endif // _ARBITRARYGEOMETRIES_
     for (z = 1; z <= xlength[2]; z++)
     {
         j = 1 + (xlength[0] + 2) + (xlength[0] + 2) * (xlength[1] + 2) * z;
@@ -23,65 +30,105 @@ void doStreamingAndCollision(double *collideField, double *streamField,int *flag
         {
             for (x = 1; x <= xlength[0]; x++)
             {
+                #ifdef _ARBITRARYGEOMETRIES_
+                streamMask = !flagField[j];
+                copyMask = !streamMask;
+                #endif // _ARBITRARYGEOMETRIES_
 
                 density = velocity[0] = velocity[1] = velocity[2] = 0;
                 // load direction i = 0;
                 // c_0 = (0, -1, -1)
+                #ifdef _ARBITRARYGEOMETRIES_
+                f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)] * streamMask + collideField[j] * copyMask;
+                #else
                 f0 = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)];
+                #endif // _ARBITRARYGEOMETRIES_
                 density += f0;
                 velocity[1] -= f0;
                 velocity[2] -= f0;
 
                 // load direction i = 1;
                 // c_1 = (-1, 0, -1)
+                #ifdef _ARBITRARYGEOMETRIES_
+                f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1] * streamMask + collideField[numberOfCells + j] * copyMask;
+                #else
                 f1 = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1];
+                #endif // _ARBITRARYGEOMETRIES_
                 density += f1;
                 velocity[0] -= f1;
                 velocity[2] -= f1;
 
                 // load direction i = 2;
                 // c_2 = (0, 0, -1)
+                #ifdef _ARBITRARYGEOMETRIES_
+                f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)] * streamMask + collideField[2 * numberOfCells + j] * copyMask;
+                #else
                 f2 = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)];
+                #endif // _ARBITRARYGEOMETRIES_
                 density += f2;
                 velocity[2] -= f2;
 
                 // load direction i = 3;
                 // c_3 = (1, 0, -1)
+                #ifdef _ARBITRARYGEOMETRIES_
+                f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1] * streamMask + collideField[3 * numberOfCells + j] * copyMask;
+                #else
                 f3 = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1];
+                #endif // _ARBITRARYGEOMETRIES_
                 density += f3;
                 velocity[0] += f3;
                 velocity[2] -= f3;
 
                 // load direction i = 4;
                 // c_4 = (0, 1, -1)
+                #ifdef _ARBITRARYGEOMETRIES_
+                f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)] * streamMask + collideField[4 * numberOfCells + j] * copyMask;
+                #else
                 f4 = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - (xlength[0] + 2)];
+                #endif // _ARBITRARYGEOMETRIES_
                 density += f4;
                 velocity[1] += f4;
                 velocity[2] -= f4;
 
                 // load direction i = 5;
                 // c_5 = (-1, -1, 0)
+                #ifdef _ARBITRARYGEOMETRIES_
+                f5 = collideField[5 * numberOfCells + j + xlength[0] + 3] * streamMask + collideField[5 * numberOfCells + j] * copyMask;
+                #else
                 f5 = collideField[5 * numberOfCells + j + xlength[0] + 3];
+                #endif // _ARBITRARYGEOMETRIES_
                 density += f5;
                 velocity[0] -= f5;
                 velocity[1] -= f5;
 
                 // load direction i = 6;
                 // c_6 = (0, -1, 0)
+                #ifdef _ARBITRARYGEOMETRIES_
+                f6 = collideField[6 * numberOfCells + j + xlength[0] + 2] * streamMask + collideField[6 * numberOfCells + j] * copyMask;
+                #else
                 f6 = collideField[6 * numberOfCells + j + xlength[0] + 2];
+                #endif // _ARBITRARYGEOMETRIES_
                 density += f6;
                 velocity[1] -= f6;
 
                 // load direction i = 7;
                 // c_7 = (1, -1, 0)
+                #ifdef _ARBITRARYGEOMETRIES_
+                f7 = collideField[7 * numberOfCells + j + xlength[0] + 1] * streamMask + collideField[7 * numberOfCells + j] * copyMask;
+                #else
                 f7 = collideField[7 * numberOfCells + j + xlength[0] + 1];
+                #endif // _ARBITRARYGEOMETRIES_
                 density += f7;
                 velocity[0] += f7;
                 velocity[1] -= f7;
 
                 // load direction i = 8;
                 // c_8 = (-1, 0, 0)
+                #ifdef _ARBITRARYGEOMETRIES_
+                f8 = collideField[8 * numberOfCells + j + 1] * streamMask + collideField[8 * numberOfCells + j] * copyMask;
+                #else
                 f8 = collideField[8 * numberOfCells + j + 1];
+                #endif // _ARBITRARYGEOMETRIES_
                 density += f8;
                 velocity[0] -= f8;
 
@@ -92,60 +139,96 @@ void doStreamingAndCollision(double *collideField, double *streamField,int *flag
 
                 // load direction i = 10;
                 // c_10 = (1, 0, 0)
+                #ifdef _ARBITRARYGEOMETRIES_
+                f10 = collideField[10 * numberOfCells + j - 1] * streamMask + collideField[10 * numberOfCells + j] * copyMask;
+                #else
                 f10 = collideField[10 * numberOfCells + j - 1];
+                #endif // _ARBITRARYGEOMETRIES_
                 density += f10;
                 velocity[0] += f10;
 
                 // load direction i = 11;
                 // c_11 = (-1, 1, 0)
+                #ifdef _ARBITRARYGEOMETRIES_
+                f11 = collideField[11 * numberOfCells + j - xlength[0] - 1] * streamMask + collideField[11 * numberOfCells + j] * copyMask;
+                #else
                 f11 = collideField[11 * numberOfCells + j - xlength[0] - 1];
+                #endif // _ARBITRARYGEOMETRIES_
                 density += f11;
                 velocity[0] -= f11;
                 velocity[1] += f11;
 
                 // load direction i = 12;
                 // c_12 = (0, 1, 0)
+                #ifdef _ARBITRARYGEOMETRIES_
+                f12 = collideField[12 * numberOfCells + j - xlength[0] - 2] * streamMask + collideField[12 * numberOfCells + j] * copyMask;
+                #else
                 f12 = collideField[12 * numberOfCells + j - xlength[0] - 2];
+                #endif // _ARBITRARYGEOMETRIES_
                 density += f12;
                 velocity[1] += f12;
 
                 // load direction i = 13;
                 // c_13 = (1, 1, 0)
+                #ifdef _ARBITRARYGEOMETRIES_
+                f13 = collideField[13 * numberOfCells + j - xlength[0] - 3] * streamMask + collideField[13 * numberOfCells + j] * copyMask;
+                #else
                 f13 = collideField[13 * numberOfCells + j - xlength[0] - 3];
+                #endif // _ARBITRARYGEOMETRIES_
                 density += f13;
                 velocity[0] += f13;
                 velocity[1] += f13;
 
                 // load direction i = 14;
                 // c_14 = (0, -1, 1)
+                #ifdef _ARBITRARYGEOMETRIES_
+                f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)] * streamMask + collideField[14 * numberOfCells + j] * copyMask;
+                #else
                 f14 = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)];
+                #endif // _ARBITRARYGEOMETRIES_
                 density += f14;
                 velocity[1] -= f14;
                 velocity[2] += f14;
 
                 // load direction i = 15;
                 // c_15 = (-1, 0, 1)
+                #ifdef _ARBITRARYGEOMETRIES_
+                f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1] * streamMask + collideField[15 * numberOfCells + j] * copyMask;
+                #else
                 f15 = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1];
+                #endif // _ARBITRARYGEOMETRIES_
                 density += f15;
                 velocity[0] -= f15;
                 velocity[2] += f15;
 
                 // load direction i = 16;
                 // c_16 = (0, 0, 1)
+                #ifdef _ARBITRARYGEOMETRIES_
+                f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)] * streamMask + collideField[16 * numberOfCells + j] * copyMask;
+                #else
                 f16 = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)];
+                #endif // _ARBITRARYGEOMETRIES_
                 density += f16;
                 velocity[2] += f16;
 
                 // load direction i = 17;
                 // c_17 = (1, 0, 1)
+                #ifdef _ARBITRARYGEOMETRIES_
+                f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1] * streamMask + collideField[17 * numberOfCells + j] * copyMask;
+                #else
                 f17 = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1];
+                #endif // _ARBITRARYGEOMETRIES_
                 density += f17;
                 velocity[0] += f17;
                 velocity[2] += f17;
 
                 // load direction i = 18;
                 // c_18 = (0, 1, 1)
+                #ifdef _ARBITRARYGEOMETRIES_
+                f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)] * streamMask + collideField[18 * numberOfCells + j] * copyMask;
+                #else
                 f18 = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)];
+                #endif // _ARBITRARYGEOMETRIES_
                 density += f18;
                 velocity[1] += f18;
                 velocity[2] += f18;
@@ -242,7 +325,7 @@ void doStreamingAndCollision(double *collideField, double *streamField,int *flag
     }
 
 }
-
+#ifdef _AVX_
 void doStreamingAndCollisionAVX(double *collideField, double *streamField,int *flagField,int *xlength, const double tau)
 {
 
@@ -713,1184 +796,5 @@ void doStreamingAndCollisionAVX(double *collideField, double *streamField,int *f
         }
         j += 2 * xlength[0] + 4;
     }
-
 }
-
-
-void doStreamingSSE(double *collideField, double *streamField,int *flagField,int *xlength, double * densities, double ** velocities)
-{
-    int  x ,y ,z, j;
-    double tmp;
-    int numberOfCells = (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
-
-
-    // i = 0
-    // c_0 = (0, -1, -1)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0]; x++)
-            {
-                tmp = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)];
-                densities[j] = tmp;
-                velocities[0][j] = 0;
-                velocities[1][j] = -tmp;
-                velocities[2][j] = -tmp;
-                streamField[j] = tmp;
-                j ++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 1
-    // c_1 = (-1, 0, -1)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0]; x++)
-            {
-                tmp = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1];
-                densities[j] += tmp;
-                velocities[0][j] -= tmp;
-                velocities[2][j] -= tmp;
-                streamField[numberOfCells + j] = tmp;
-                j ++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 2
-    // c_2 = (0, 0, -1)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0]; x++)
-            {
-                tmp = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)];
-                densities[j] += tmp;
-                velocities[2][j] -= tmp;
-                streamField[2 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 3
-    // c_3 = (1, 0, -1)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0]; x++)
-            {
-                tmp = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1];
-                densities[j] += tmp;
-                velocities[0][j] += tmp;
-                velocities[2][j] -= tmp;
-                streamField[3 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 4
-    // c_4 = (0, 1, -1)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0]; x++)
-            {
-                tmp = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 1)];
-                densities[j] += tmp;
-                velocities[1][j] += tmp;
-                velocities[2][j] -= tmp;
-                streamField[4 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 5
-    // c_5 = (-1, -1, 0)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0]; x++)
-            {
-                tmp = collideField[5 * numberOfCells + j + xlength[0] + 3];
-                densities[j] += tmp;
-                velocities[0][j] -= tmp;
-                velocities[1][j] -= tmp;
-                streamField[5 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 6
-    // c_6 = (0, -1, 0)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0]; x++)
-            {
-                tmp = collideField[6 * numberOfCells + j + xlength[0] + 2];
-                densities[j] += tmp;
-                velocities[1][j] -= tmp;
-                streamField[6 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 7
-    // c_7 = (1, -1, 0)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0]; x++)
-            {
-                tmp = collideField[7 * numberOfCells + j + xlength[0] + 1];
-                densities[j] += tmp;
-                velocities[0][j] += tmp;
-                velocities[1][j] -= tmp;
-                streamField[7 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 8
-    // c_8 = (-1, 0, 0)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0]; x++)
-            {
-                tmp = collideField[8 * numberOfCells + j + 1];
-                densities[j] += tmp;
-                velocities[0][j] -= tmp;
-                streamField[8 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 9
-    // c_9 = (0, 0, 0)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0]; x++)
-            {
-                tmp = collideField[9 * numberOfCells + j];
-                densities[j] += tmp;
-                streamField[9 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 10
-    // c_10 = (1, 0, 0)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0]; x++)
-            {
-                tmp = collideField[10 * numberOfCells + j - 1];
-                densities[j] += tmp;
-                velocities[0][j] += tmp;
-                streamField[10 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 11
-    // c_11 = (-1, 1, 0)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0]; x++)
-            {
-                tmp = collideField[11 * numberOfCells + j - xlength[0] - 1];
-                densities[j] += tmp;
-                velocities[0][j] -= tmp;
-                velocities[1][j] += tmp;
-                streamField[11 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 12
-    // c_12 = (0, 1, 0)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0]; x++)
-            {
-                tmp = collideField[12 * numberOfCells + j - xlength[0] - 2];
-                densities[j] += tmp;
-                velocities[1][j] += tmp;
-                streamField[12 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 13
-    // c_13 = (1, 1, 0)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0]; x++)
-            {
-                tmp = collideField[13 * numberOfCells + j - xlength[0] - 3];
-                densities[j] += tmp;
-                velocities[0][j] += tmp;
-                velocities[1][j] += tmp;
-                streamField[13 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 14
-    // c_14 = (0, -1, 1)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0]; x++)
-            {
-                tmp = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)];
-                densities[j] += tmp;
-                velocities[1][j] -= tmp;
-                velocities[2][j] += tmp;
-                streamField[14 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 15
-    // c_15 = (-1, 0, 1)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0]; x++)
-            {
-                tmp = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1];
-                densities[j] += tmp;
-                velocities[0][j] -= tmp;
-                velocities[2][j] += tmp;
-                streamField[15 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 16
-    // c_16 = (0, 0, 1)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0]; x++)
-            {
-                tmp = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)];
-                densities[j] += tmp;
-                velocities[2][j] += tmp;
-                streamField[16 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 17
-    // c_17 = (1, 0, 1)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0]; x++)
-            {
-                tmp = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1];
-                densities[j] += tmp;
-                velocities[0][j] += tmp;
-                velocities[2][j] += tmp;
-                streamField[17 * numberOfCells + j] = tmp;
-                j ++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 18
-    // c_18 = (0, 1, 1)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0]; x++)
-            {
-                tmp = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)];
-                densities[j] += tmp;
-                velocities[0][j] = velocities[0][j] / densities[j];
-                velocities[1][j] = (velocities[1][j] + tmp) / densities[j];
-                velocities[2][j] = (velocities[2][j] + tmp) / densities[j];
-                streamField[18 * numberOfCells + j] = tmp;
-                j ++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-}
-
-void doStreamingAVX(double *collideField, double *streamField,int *flagField,int *xlength)
-{
-    // only for streaming/propogation optimized version
-    int streamCellIndex , neighbourCellIndex, i, j;
-    int number_cells = (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
-    int offset;
-    __m128i ones = _mm_set1_epi32(1);
-    __m128i zeros = _mm_set1_epi32(0);
-    __m128i tmp;
-    __m256d streamMask, copyMask;
-    __m256d collideEntriesOwn, collideEntriesNeighbours, result;
-
-    for (i = 0; i < PARAMQ; i++)
-    {
-        offset = LATTICEVELOCITIES[i][0] + LATTICEVELOCITIES[i][1] * (xlength[0] + 2) + LATTICEVELOCITIES[i][2] * (xlength[0] + 2) * (xlength[1] + 2);
-        for (j = max(0, -offset); j < min(number_cells + offset, number_cells) - 3; j += 4)
-        {
-            tmp = _mm_loadu_si128((__m128i *) &flagField[j]);
-            tmp = _mm_min_epi32(_mm_max_epi32(tmp, zeros), ones);
-            copyMask = _mm256_cvtepi32_pd(tmp);
-            tmp = _mm_sub_epi32(ones, tmp);
-            streamMask = _mm256_cvtepi32_pd(tmp);
-
-            collideEntriesOwn = _mm256_loadu_pd(collideField + j + i * number_cells);
-            collideEntriesNeighbours = _mm256_loadu_pd(collideField + j - offset + i * number_cells);
-
-            result = _mm256_add_pd(_mm256_mul_pd(streamMask, collideEntriesNeighbours), _mm256_mul_pd(copyMask, collideEntriesOwn));
-            _mm256_storeu_pd(streamField + j + i * number_cells, result);
-        }
-
-        for (; j < min(number_cells + offset, number_cells); j++)
-        {
-            if (!flagField[j])
-            {
-                streamCellIndex = j + i * number_cells;
-                neighbourCellIndex = streamCellIndex - offset;
-                streamField[streamCellIndex] = collideField[neighbourCellIndex];
-            }
-        }
-    }
-}
-
-void doStreamingAVXv2(double *collideField, double *streamField,int *flagField,int *xlength, double * densities, double ** velocities)
-{
-    int  x ,y ,z, j;
-    double tmp;
-    int numberOfCells = (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
-
-    __m256d densityVector, velocityX, velocityY, velocityZ;
-    const double zero = 0.0;
-    __m256d zeroVector = _mm256_broadcast_sd(&zero);
-    __m256d tmpv;
-
-    // i = 0
-    // c_0 = (0, -1, -1)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0] - 4; x += 4)
-            {
-                tmpv = _mm256_loadu_pd(&collideField[j + (xlength[0] + 2) * (xlength[1] + 3)]);
-                _mm256_storeu_pd(densities + j, tmpv);
-                _mm256_storeu_pd(velocities[0] + j, zeroVector);
-                _mm256_storeu_pd(velocities[1] + j, _mm256_sub_pd(zeroVector, tmpv));
-                _mm256_storeu_pd(velocities[2] + j, _mm256_sub_pd(zeroVector, tmpv));
-                _mm256_storeu_pd(&streamField[j], tmpv);
-                j += 4;
-            }
-
-            for (; x <= xlength[0]; x++)
-            {
-                tmp = collideField[j + (xlength[0] + 2) * (xlength[1] + 3)];
-                densities[j] = tmp;
-                velocities[0][j] = 0;
-                velocities[1][j] = -tmp;
-                velocities[2][j] = -tmp;
-                streamField[j] = tmp;
-                j ++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 1
-    // c_1 = (-1, 0, -1)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0] - 4; x += 4)
-            {
-                tmpv = _mm256_loadu_pd(&collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1]);
-
-                densityVector = _mm256_loadu_pd(&densities[j]);
-                densityVector = _mm256_add_pd(densityVector, tmpv);
-                _mm256_storeu_pd(&densities[j], densityVector);
-
-                velocityX = _mm256_loadu_pd(velocities[0] + j);
-                velocityX = _mm256_sub_pd(velocityX, tmpv);
-                _mm256_storeu_pd(velocities[0] + j, velocityX);
-
-                velocityZ = _mm256_loadu_pd(velocities[2] + j);
-                velocityZ = _mm256_sub_pd(velocityZ, tmpv);
-                _mm256_storeu_pd(velocities[2] + j, velocityZ);
-
-                _mm256_storeu_pd(streamField + numberOfCells + j, tmpv);
-                j += 4;
-            }
-
-            for (; x <= xlength[0]; x++)
-            {
-                tmp = collideField[numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) + 1];
-                densities[j] += tmp;
-                velocities[0][j] -= tmp;
-                velocities[2][j] -= tmp;
-                streamField[numberOfCells + j] = tmp;
-                j ++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 2
-    // c_2 = (0, 0, -1)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0] - 4; x += 4)
-            {
-                tmpv = _mm256_loadu_pd(&collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)]);
-
-                densityVector = _mm256_loadu_pd(&densities[j]);
-                densityVector = _mm256_add_pd(densityVector, tmpv);
-                _mm256_storeu_pd(&densities[j], densityVector);
-
-                velocityZ = _mm256_loadu_pd(velocities[2] + j);
-                velocityZ = _mm256_sub_pd(velocityZ, tmpv);
-                _mm256_storeu_pd(velocities[2] + j, velocityZ);
-
-                _mm256_storeu_pd(streamField + 2 * numberOfCells + j, tmpv);
-                j += 4;
-            }
-
-            for (; x <= xlength[0]; x++)
-            {
-                tmp = collideField[2 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2)];
-                densities[j] += tmp;
-                velocities[2][j] -= tmp;
-                streamField[2 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 3
-    // c_3 = (1, 0, -1)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0] - 4; x += 4)
-            {
-                tmpv = _mm256_loadu_pd(&collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1]);
-
-                densityVector = _mm256_loadu_pd(&densities[j]);
-                densityVector = _mm256_add_pd(densityVector, tmpv);
-                _mm256_storeu_pd(&densities[j], densityVector);
-
-                velocityX = _mm256_loadu_pd(velocities[0] + j);
-                velocityX = _mm256_add_pd(velocityX, tmpv);
-                _mm256_storeu_pd(velocities[0] + j, velocityX);
-
-                velocityZ = _mm256_loadu_pd(velocities[2] + j);
-                velocityZ = _mm256_sub_pd(velocityZ, tmpv);
-                _mm256_storeu_pd(velocities[2] + j, velocityZ);
-
-                _mm256_storeu_pd(streamField + 3 * numberOfCells + j, tmpv);
-                j += 4;
-            }
-
-            for (; x <= xlength[0]; x++)
-            {
-                tmp = collideField[3 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 2) - 1];
-                densities[j] += tmp;
-                velocities[0][j] += tmp;
-                velocities[2][j] -= tmp;
-                streamField[3 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 4
-    // c_4 = (0, 1, -1)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0] - 4; x += 4)
-            {
-                tmpv = _mm256_loadu_pd(&collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 1)]);
-
-                densityVector = _mm256_loadu_pd(&densities[j]);
-                densityVector = _mm256_add_pd(densityVector, tmpv);
-                _mm256_storeu_pd(&densities[j], densityVector);
-
-                velocityY = _mm256_loadu_pd(velocities[1] + j);
-                velocityY = _mm256_add_pd(velocityY, tmpv);
-                _mm256_storeu_pd(velocities[1] + j, velocityY);
-
-                velocityZ = _mm256_loadu_pd(velocities[2] + j);
-                velocityZ = _mm256_sub_pd(velocityZ, tmpv);
-                _mm256_storeu_pd(velocities[2] + j, velocityZ);
-
-                _mm256_storeu_pd(streamField + 4 * numberOfCells + j, tmpv);
-                j += 4;
-            }
-
-            for (; x <= xlength[0]; x++)
-            {
-                tmp = collideField[4 * numberOfCells + j + (xlength[0] + 2) * (xlength[1] + 1)];
-                densities[j] += tmp;
-                velocities[1][j] += tmp;
-                velocities[2][j] -= tmp;
-                streamField[4 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 5
-    // c_5 = (-1, -1, 0)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0] - 4; x += 4)
-            {
-                tmpv = _mm256_loadu_pd(&collideField[5 * numberOfCells + j + xlength[0] + 3]);
-                densityVector = _mm256_loadu_pd(&densities[j]);
-                densityVector = _mm256_add_pd(densityVector, tmpv);
-                _mm256_storeu_pd(&densities[j], densityVector);
-
-                velocityX = _mm256_loadu_pd(velocities[0] + j);
-                velocityX = _mm256_sub_pd(velocityX, tmpv);
-                _mm256_storeu_pd(velocities[0] + j, velocityX);
-
-                velocityY = _mm256_loadu_pd(velocities[1] + j);
-                velocityY = _mm256_sub_pd(velocityY, tmpv);
-                _mm256_storeu_pd(velocities[1] + j, velocityY);
-
-                _mm256_storeu_pd(streamField + 5 * numberOfCells + j, tmpv);
-                j += 4;
-            }
-
-            for (; x <= xlength[0]; x++)
-            {
-                tmp = collideField[5 * numberOfCells + j + xlength[0] + 3];
-                densities[j] += tmp;
-                velocities[0][j] -= tmp;
-                velocities[1][j] -= tmp;
-                streamField[5 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 6
-    // c_6 = (0, -1, 0)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0] - 4; x += 4)
-            {
-                tmpv = _mm256_loadu_pd(&collideField[6 * numberOfCells + j + xlength[0] + 2]);
-                densityVector = _mm256_loadu_pd(&densities[j]);
-                densityVector = _mm256_add_pd(densityVector, tmpv);
-                _mm256_storeu_pd(&densities[j], densityVector);
-
-                velocityY = _mm256_loadu_pd(velocities[1] + j);
-                velocityY = _mm256_sub_pd(velocityY, tmpv);
-                _mm256_storeu_pd(velocities[1] + j, velocityY);
-
-                _mm256_storeu_pd(streamField + 6 * numberOfCells + j, tmpv);
-                j += 4;
-            }
-
-            for (; x <= xlength[0]; x++)
-            {
-                tmp = collideField[6 * numberOfCells + j + xlength[0] + 2];
-                densities[j] += tmp;
-                velocities[1][j] -= tmp;
-                streamField[6 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 7
-    // c_7 = (1, -1, 0)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0] - 4; x += 4)
-            {
-                tmpv = _mm256_loadu_pd(&collideField[7 * numberOfCells + j + xlength[0] + 1]);
-                densityVector = _mm256_loadu_pd(&densities[j]);
-                densityVector = _mm256_add_pd(densityVector, tmpv);
-                _mm256_storeu_pd(&densities[j], densityVector);
-
-                velocityX = _mm256_loadu_pd(velocities[0] + j);
-                velocityX = _mm256_add_pd(velocityX, tmpv);
-                _mm256_storeu_pd(velocities[0] + j, velocityX);
-
-                velocityY = _mm256_loadu_pd(velocities[1] + j);
-                velocityY = _mm256_sub_pd(velocityY, tmpv);
-                _mm256_storeu_pd(velocities[1] + j, velocityY);
-
-                _mm256_storeu_pd(streamField + 7 * numberOfCells + j, tmpv);
-                j += 4;
-            }
-
-
-            for (; x <= xlength[0]; x++)
-            {
-                tmp = collideField[7 * numberOfCells + j + xlength[0] + 1];
-                densities[j] += tmp;
-                velocities[0][j] += tmp;
-                velocities[1][j] -= tmp;
-                streamField[7 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 8
-    // c_8 = (-1, 0, 0)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0] - 4; x += 4)
-            {
-                tmpv = _mm256_loadu_pd(&collideField[8 * numberOfCells + j + 1]);
-                densityVector = _mm256_loadu_pd(&densities[j]);
-                densityVector = _mm256_add_pd(densityVector, tmpv);
-                _mm256_storeu_pd(&densities[j], densityVector);
-
-                velocityX = _mm256_loadu_pd(velocities[0] + j);
-                velocityX = _mm256_sub_pd(velocityX, tmpv);
-                _mm256_storeu_pd(velocities[0] + j, velocityX);
-
-                _mm256_storeu_pd(streamField + 8 * numberOfCells + j, tmpv);
-                j += 4;
-            }
-
-            for (; x <= xlength[0]; x++)
-            {
-                tmp = collideField[8 * numberOfCells + j + 1];
-                densities[j] += tmp;
-                velocities[0][j] -= tmp;
-                streamField[8 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 9
-    // c_9 = (0, 0, 0)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0] - 4; x += 4)
-            {
-                tmpv = _mm256_loadu_pd(&collideField[9 * numberOfCells + j]);
-                densityVector = _mm256_loadu_pd(&densities[j]);
-                densityVector = _mm256_add_pd(densityVector, tmpv);
-                _mm256_storeu_pd(&densities[j], densityVector);
-
-                _mm256_storeu_pd(streamField + 9 * numberOfCells + j, tmpv);
-                j += 4;
-            }
-
-            for (; x <= xlength[0]; x++)
-            {
-                tmp = collideField[9 * numberOfCells + j];
-                densities[j] += tmp;
-                streamField[9 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 10
-    // c_10 = (1, 0, 0)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0] - 4; x += 4)
-            {
-                tmpv = _mm256_loadu_pd(&collideField[10 * numberOfCells + j - 1]);
-                densityVector = _mm256_loadu_pd(&densities[j]);
-                densityVector = _mm256_add_pd(densityVector, tmpv);
-                _mm256_storeu_pd(&densities[j], densityVector);
-
-                velocityX = _mm256_loadu_pd(velocities[0] + j);
-                velocityX = _mm256_add_pd(velocityX, tmpv);
-                _mm256_storeu_pd(velocities[0] + j, velocityX);
-
-                _mm256_storeu_pd(streamField + 10 * numberOfCells + j, tmpv);
-                j += 4;
-            }
-
-            for (; x <= xlength[0]; x++)
-            {
-                tmp = collideField[10 * numberOfCells + j - 1];
-                densities[j] += tmp;
-                velocities[0][j] += tmp;
-                streamField[10 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 11
-    // c_11 = (-1, 1, 0)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0] - 4; x += 4)
-            {
-                tmpv = _mm256_loadu_pd(&collideField[11 * numberOfCells + j - xlength[0] - 1]);
-                densityVector = _mm256_loadu_pd(&densities[j]);
-                densityVector = _mm256_add_pd(densityVector, tmpv);
-                _mm256_storeu_pd(&densities[j], densityVector);
-
-                velocityX = _mm256_loadu_pd(velocities[0] + j);
-                velocityX = _mm256_sub_pd(velocityX, tmpv);
-                _mm256_storeu_pd(velocities[0] + j, velocityX);
-
-                velocityY = _mm256_loadu_pd(velocities[1] + j);
-                velocityY = _mm256_add_pd(velocityY, tmpv);
-                _mm256_storeu_pd(velocities[1] + j, velocityY);
-
-                _mm256_storeu_pd(streamField + 11 * numberOfCells + j, tmpv);
-                j += 4;
-            }
-
-            for (; x <= xlength[0]; x++)
-            {
-                tmp = collideField[11 * numberOfCells + j - xlength[0] - 1];
-                densities[j] += tmp;
-                velocities[0][j] -= tmp;
-                velocities[1][j] += tmp;
-                streamField[11 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 12
-    // c_12 = (0, 1, 0)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0] - 4; x += 4)
-            {
-                tmpv = _mm256_loadu_pd(&collideField[12 * numberOfCells + j - xlength[0] - 2]);
-                densityVector = _mm256_loadu_pd(&densities[j]);
-                densityVector = _mm256_add_pd(densityVector, tmpv);
-                _mm256_storeu_pd(&densities[j], densityVector);
-
-                velocityY = _mm256_loadu_pd(velocities[1] + j);
-                velocityY = _mm256_add_pd(velocityY, tmpv);
-                _mm256_storeu_pd(velocities[1] + j, velocityY);
-
-                _mm256_storeu_pd(streamField + 12 * numberOfCells + j, tmpv);
-                j += 4;
-            }
-
-            for (; x <= xlength[0]; x++)
-            {
-                tmp = collideField[12 * numberOfCells + j - xlength[0] - 2];
-                densities[j] += tmp;
-                velocities[1][j] += tmp;
-                streamField[12 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 13
-    // c_13 = (1, 1, 0)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0] - 4; x += 4)
-            {
-                tmpv = _mm256_loadu_pd(&collideField[13 * numberOfCells + j - xlength[0] - 3]);
-                densityVector = _mm256_loadu_pd(&densities[j]);
-                densityVector = _mm256_add_pd(densityVector, tmpv);
-                _mm256_storeu_pd(&densities[j], densityVector);
-
-                velocityX = _mm256_loadu_pd(velocities[0] + j);
-                velocityX = _mm256_add_pd(velocityX, tmpv);
-                _mm256_storeu_pd(velocities[0] + j, velocityX);
-
-                velocityY = _mm256_loadu_pd(velocities[1] + j);
-                velocityY = _mm256_add_pd(velocityY, tmpv);
-                _mm256_storeu_pd(velocities[1] + j, velocityY);
-
-                _mm256_storeu_pd(streamField + 13 * numberOfCells + j, tmpv);
-                j += 4;
-            }
-
-            for (; x <= xlength[0]; x++)
-            {
-                tmp = collideField[13 * numberOfCells + j - xlength[0] - 3];
-                densities[j] += tmp;
-                velocities[0][j] += tmp;
-                velocities[1][j] += tmp;
-                streamField[13 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 14
-    // c_14 = (0, -1, 1)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0] - 4; x += 4)
-            {
-                tmpv = _mm256_loadu_pd(&collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)]);
-                densityVector = _mm256_loadu_pd(&densities[j]);
-                densityVector = _mm256_add_pd(densityVector, tmpv);
-                _mm256_storeu_pd(&densities[j], densityVector);
-
-                velocityY = _mm256_loadu_pd(velocities[1] + j);
-                velocityY = _mm256_sub_pd(velocityY, tmpv);
-                _mm256_storeu_pd(velocities[1] + j, velocityY);
-
-                velocityZ = _mm256_loadu_pd(velocities[2] + j);
-                velocityZ = _mm256_add_pd(velocityZ, tmpv);
-                _mm256_storeu_pd(velocities[2] + j, velocityZ);
-
-                _mm256_storeu_pd(streamField + 14 * numberOfCells + j, tmpv);
-                j += 4;
-            }
-
-            for (; x <= xlength[0]; x++)
-            {
-                tmp = collideField[14 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 1)];
-                densities[j] += tmp;
-                velocities[1][j] -= tmp;
-                velocities[2][j] += tmp;
-                streamField[14 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 15
-    // c_15 = (-1, 0, 1)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0] - 4; x += 4)
-            {
-                tmpv = _mm256_loadu_pd(&collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1]);
-                densityVector = _mm256_loadu_pd(&densities[j]);
-                densityVector = _mm256_add_pd(densityVector, tmpv);
-                _mm256_storeu_pd(&densities[j], densityVector);
-
-                velocityX = _mm256_loadu_pd(velocities[0] + j);
-                velocityX = _mm256_sub_pd(velocityX, tmpv);
-                _mm256_storeu_pd(velocities[0] + j, velocityX);
-
-                velocityZ = _mm256_loadu_pd(velocities[2] + j);
-                velocityZ = _mm256_add_pd(velocityZ, tmpv);
-                _mm256_storeu_pd(velocities[2] + j, velocityZ);
-
-                _mm256_storeu_pd(streamField + 15 * numberOfCells + j, tmpv);
-                j += 4;
-            }
-
-            for (; x <= xlength[0]; x++)
-            {
-                tmp = collideField[15 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) + 1];
-                densities[j] += tmp;
-                velocities[0][j] -= tmp;
-                velocities[2][j] += tmp;
-                streamField[15 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 16
-    // c_16 = (0, 0, 1)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0] - 4; x += 4)
-            {
-                tmpv = _mm256_loadu_pd(&collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)]);
-                densityVector = _mm256_loadu_pd(&densities[j]);
-                densityVector = _mm256_add_pd(densityVector, tmpv);
-                _mm256_storeu_pd(&densities[j], densityVector);
-
-                velocityZ = _mm256_loadu_pd(velocities[2] + j);
-                velocityZ = _mm256_add_pd(velocityZ, tmpv);
-                _mm256_storeu_pd(velocities[2] + j, velocityZ);
-
-                _mm256_storeu_pd(streamField + 16 * numberOfCells + j, tmpv);
-                j += 4;
-            }
-
-            for (; x <= xlength[0]; x++)
-            {
-                tmp = collideField[16 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2)];
-                densities[j] += tmp;
-                velocities[2][j] += tmp;
-                streamField[16 * numberOfCells + j] = tmp;
-                j++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 17
-    // c_17 = (1, 0, 1)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0] - 4; x += 4)
-            {
-                tmpv = _mm256_loadu_pd(&collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1]);
-                densityVector = _mm256_loadu_pd(&densities[j]);
-                densityVector = _mm256_add_pd(densityVector, tmpv);
-                _mm256_storeu_pd(&densities[j], densityVector);
-
-                velocityX  = _mm256_loadu_pd(velocities[0] + j);
-                velocityX = _mm256_add_pd(velocityX, tmpv);
-                _mm256_storeu_pd(velocities[0] + j, velocityX);
-
-                velocityZ = _mm256_loadu_pd(velocities[2] + j);
-                velocityZ = _mm256_add_pd(velocityZ, tmpv);
-                _mm256_storeu_pd(velocities[2] + j, velocityZ);
-
-                _mm256_storeu_pd(streamField + 17 * numberOfCells + j, tmpv);
-                j += 4;
-            }
-
-            for (; x <= xlength[0]; x++)
-            {
-                tmp = collideField[17 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 2) - 1];
-                densities[j] += tmp;
-                velocities[0][j] += tmp;
-                velocities[2][j] += tmp;
-                streamField[17 * numberOfCells + j] = tmp;
-                j ++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-
-    // i = 18
-    // c_18 = (0, 1, 1)
-    j = (xlength[0] + 2)*(xlength[1] + 3) + 1;
-    for (z = 1; z <= xlength[2]; z++)
-    {
-        for (y = 1; y <= xlength[1]; y++)
-        {
-            for (x = 1; x <= xlength[0] - 4; x += 4)
-            {
-                tmpv = _mm256_loadu_pd(&collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)]);
-                densityVector = _mm256_loadu_pd(&densities[j]);
-                densityVector = _mm256_add_pd(densityVector, tmpv);
-                _mm256_storeu_pd(&densities[j], densityVector);
-
-                velocityX = _mm256_loadu_pd(velocities[0] + j);
-                velocityX = _mm256_div_pd(velocityX, densityVector);
-                _mm256_storeu_pd(velocities[0] + j, velocityX);
-
-                velocityY = _mm256_loadu_pd(velocities[1] + j);
-                velocityY = _mm256_div_pd(_mm256_add_pd(velocityY, tmpv), densityVector);
-                _mm256_storeu_pd(velocities[1] + j, velocityY);
-
-                velocityZ = _mm256_loadu_pd(velocities[2] + j);
-                velocityZ = _mm256_div_pd(_mm256_add_pd(velocityZ, tmpv), densityVector);
-                _mm256_storeu_pd(velocities[2] + j, velocityZ);
-
-                _mm256_storeu_pd(streamField + 18 * numberOfCells + j, tmpv);
-                j += 4;
-            }
-
-            for (; x <= xlength[0]; x++)
-            {
-                tmp = collideField[18 * numberOfCells + j - (xlength[0] + 2) * (xlength[1] + 3)];
-                densities[j] += tmp;
-                velocities[0][j] = velocities[0][j] / densities[j];
-                velocities[1][j] = (velocities[1][j] + tmp) / densities[j];
-                velocities[2][j] = (velocities[2][j] + tmp) / densities[j];
-                streamField[18 * numberOfCells + j] = tmp;
-                j ++;
-            }
-            j += 2;
-        }
-        j += 2 * xlength[0] + 4;
-    }
-}
+#endif // _AVX_

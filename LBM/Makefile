@@ -1,17 +1,17 @@
 # Include files
-SOURCES=initLB.c visualLB.c boundary.c collision.c streaming.c computeCellValues.c main.c helper.c
+SOURCES=initLB.c visualLB.c boundary.c streaming.c computeCellValues.c main.c helper.c
 
 # Compiler
 # --------
 CC=gcc
 
-CFLAGS=-pedantic -Wall -std=gnu99 -fopenmp -Ofast -msse3 -mavx -funroll-loops -g -pg
+CFLAGS=-pedantic -Wall -std=gnu99 -fopenmp -Ofast -msse3 -mavx  -funroll-loops -g
 
 
 
 # Linker flags
 # ------------
-LDFLAGS= -lpapi -fopenmp -pg
+LDFLAGS= -lpapi -fopenmp 
 
 OBJECTS=$(SOURCES:.c=.o)
 EXECUTABLE=lbsim
