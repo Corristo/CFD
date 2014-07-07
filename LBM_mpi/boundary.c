@@ -34,9 +34,9 @@ void treatBoundary(double *collideField, int* flagField, const double * const bd
 #endif // _ARBITRARYGEOMETRIES_
 
 #ifdef _ARBITRARYGEOMETRIES_
-    #pragma omp parallel default(none) private(i, x, y, z, neighbourCoordX, neighbourCoordY, neighbourCoordZ, currentCellIndex, neighbourCellIndex, density, velocity, feq) shared(inflowFeq, referenceDensity, collideField, flagField, xlength, iCoord, jCoord, kCoord)
+    #pragma omp parallel private(i, x, y, z, neighbourCoordX, neighbourCoordY, neighbourCoordZ, currentCellIndex, neighbourCellIndex, density, velocity, feq) shared(inflowFeq, referenceDensity, collideField, flagField, xlength, iCoord, jCoord, kCoord)
 #else
-    #pragma omp parallel default(none) private(i, x, y, z, neighbourCoordX, neighbourCoordY, neighbourCoordZ, currentCellIndex, neighbourCellIndex, density) shared(collideField, flagField, xlength, iCoord, jCoord, kCoord)
+    #pragma omp parallel private(i, x, y, z, neighbourCoordX, neighbourCoordY, neighbourCoordZ, currentCellIndex, neighbourCellIndex, density) shared(collideField, flagField, xlength, iCoord, jCoord, kCoord)
 #endif // _ARBITRARYGEOMETRIES_
     {
 #ifndef _ARBITRARYGEOMETRIES_

@@ -25,9 +25,9 @@ void doStreamingAndCollision(double *collideField, double *streamField,int *flag
     {
     case 1:
 #ifdef _ARBITRARYGEOMETRIES_
-        #pragma omp parallel for default(none) private(copyMask, streamMask, f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, density, velocity, tmpFeq0, tmpFeq1, tmpFeq2, dotProduct, x, y, z, j) shared(xlength, flagField, streamField, collideField) schedule(static)
+        #pragma omp parallel for private(copyMask, streamMask, f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, density, velocity, tmpFeq0, tmpFeq1, tmpFeq2, dotProduct, x, y, z, j) shared(xlength, flagField, streamField, collideField) schedule(static)
 #else
-        #pragma omp parallel for default(none) private(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, density, velocity, tmpFeq0, tmpFeq1, tmpFeq2, dotProduct, x, y, z, j) shared(xlength, streamField, collideField) schedule(static)
+        #pragma omp parallel for private(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, density, velocity, tmpFeq0, tmpFeq1, tmpFeq2, dotProduct, x, y, z, j) shared(xlength, streamField, collideField) schedule(static)
 #endif
         for (z = 2; z <= xlength[2] / 3; z++)
         {
@@ -331,9 +331,9 @@ void doStreamingAndCollision(double *collideField, double *streamField,int *flag
         break;
     case 2:
 #ifdef _ARBITRARYGEOMETRIES_
-        #pragma omp parallel for default(none) private(copyMask, streamMask, f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, density, velocity, tmpFeq0, tmpFeq1, tmpFeq2, dotProduct, x, y, z, j) shared(xlength, flagField, streamField, collideField) schedule(static)
+        #pragma omp parallel for private(copyMask, streamMask, f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, density, velocity, tmpFeq0, tmpFeq1, tmpFeq2, dotProduct, x, y, z, j) shared(xlength, flagField, streamField, collideField) schedule(static)
 #else
-        #pragma omp parallel for default(none) private(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, density, velocity, tmpFeq0, tmpFeq1, tmpFeq2, dotProduct, x, y, z, j) shared(xlength, streamField, collideField) schedule(static)
+        #pragma omp parallel for private(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, density, velocity, tmpFeq0, tmpFeq1, tmpFeq2, dotProduct, x, y, z, j) shared(xlength, streamField, collideField) schedule(static)
 #endif
         for (z = xlength[2] / 3 + 1; z <= 2 * xlength[2] / 3; z++)
         {
@@ -637,9 +637,9 @@ void doStreamingAndCollision(double *collideField, double *streamField,int *flag
         break;
     case 3:
 #ifdef _ARBITRARYGEOMETRIES_
-        #pragma omp parallel for default(none) private(copyMask, streamMask, f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, density, velocity, tmpFeq0, tmpFeq1, tmpFeq2, dotProduct, x, y, z, j) shared(xlength, flagField, streamField, collideField) schedule(static)
+        #pragma omp parallel for private(copyMask, streamMask, f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, density, velocity, tmpFeq0, tmpFeq1, tmpFeq2, dotProduct, x, y, z, j) shared(xlength, flagField, streamField, collideField) schedule(static)
 #else
-        #pragma omp parallel for default(none) private(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, density, velocity, tmpFeq0, tmpFeq1, tmpFeq2, dotProduct, x, y, z, j) shared( xlength, streamField, collideField) schedule(static)
+        #pragma omp parallel for private(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, density, velocity, tmpFeq0, tmpFeq1, tmpFeq2, dotProduct, x, y, z, j) shared( xlength, streamField, collideField) schedule(static)
 #endif
         for (z = 2 * xlength[2] / 3 + 1; z <= xlength[2]; z++)
         {
@@ -943,9 +943,9 @@ void doStreamingAndCollision(double *collideField, double *streamField,int *flag
         break;
     case 4:
 #ifdef _ARBITRARYGEOMETRIES_
-        #pragma omp parallel default(none) private(copyMask, streamMask, f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, density, velocity, tmpFeq0, tmpFeq1, tmpFeq2, dotProduct, x, y, z, j) shared(xlength, flagField, streamField, collideField)
+        #pragma omp parallel private(copyMask, streamMask, f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, density, velocity, tmpFeq0, tmpFeq1, tmpFeq2, dotProduct, x, y, z, j) shared(xlength, flagField, streamField, collideField)
 #else
-        #pragma omp parallel default(none) private(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, density, velocity, tmpFeq0, tmpFeq1, tmpFeq2, dotProduct, x, y, z, j) shared( xlength, streamField, collideField)
+        #pragma omp parallel private(f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, density, velocity, tmpFeq0, tmpFeq1, tmpFeq2, dotProduct, x, y, z, j) shared( xlength, streamField, collideField)
 #endif
     {
         /** z = 1 */

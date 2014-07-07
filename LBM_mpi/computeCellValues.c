@@ -2,10 +2,7 @@
 #include "LBDefinitions.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <x86intrin.h>
-#include <emmintrin.h>
-#include <xmmintrin.h>
-
+#include <immintrin.h>
  void computeDensity(const double *const currentCell, double *density)
 {
     *density = 0.0;

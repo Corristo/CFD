@@ -5,13 +5,13 @@ SOURCES=initLB.c visualLB.c collision.c boundary.c streaming.c computeCellValues
 # --------
 CC=mpicc
 
-CFLAGS=-pedantic -Wall -std=gnu99 -fopenmp -Ofast -msse3 -mavx -funroll-loops -g 
+CFLAGS=-pedantic -Wall -std=gnu99 -fopenmp -Ofast -msse3 -funroll-loops -g $(PAPI_INC)
 
 
 
 # Linker flags
 # ------------
-LDFLAGS=-fopenmp -lpapi 
+LDFLAGS=-lpapi -fopenmp $(PAPI_LIB)
 OBJECTS=$(SOURCES:.c=.o)
 EXECUTABLE=lbsim
 

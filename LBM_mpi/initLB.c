@@ -92,9 +92,9 @@ void initialiseFields( double *collideField, double *streamField, int *flagField
 #endif // _ARBITRARYGEOMETRY_
     computePosition(iProc, jProc, kProc, &iCoord, &jCoord, &kCoord);
 #ifdef _ARBITRARYGEOMETRIES_
-    #pragma omp parallel default(none) private(x, y, z, i) shared(iCoord, jCoord, kCoord, collideField, flagField, streamField, xlength, problem, pgmInput, pgmImage, local_xlength, iProc, jProc, kProc)
+    #pragma omp parallel private(x, y, z, i) shared(iCoord, jCoord, kCoord, collideField, flagField, streamField, xlength, problem, pgmInput, pgmImage, local_xlength, iProc, jProc, kProc)
 #else
-    #pragma omp parallel default(none) private(x, y, z, i) shared(iCoord, jCoord, kCoord, collideField, flagField, streamField, xlength, local_xlength, iProc, jProc, kProc)
+    #pragma omp parallel private(x, y, z, i) shared(iCoord, jCoord, kCoord, collideField, flagField, streamField, xlength, local_xlength, iProc, jProc, kProc)
 #endif // _ARBITRARYGEOMETRY_
     {
         #pragma omp for schedule(static)
