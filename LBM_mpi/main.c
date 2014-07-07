@@ -58,6 +58,14 @@ int main(int argc, char *argv[])
     MPI_Init( &argc, &argv );
     MPI_Comm_size( MPI_COMM_WORLD, &number_of_ranks );      /* asking for the number of processes  */
     MPI_Comm_rank( MPI_COMM_WORLD, &rank );                 /* asking for the local process id   */
+ 
+    MPI_File fh;
+    int err = MPI_File_open( MPI_COMM_WORLD, "VTK.bin.data", MPI_MODE_RDWR | MPI_MODE_CREATE, MPI_INFO_NULL, &fh );
+    if (err) {
+        fprintf(stderr, "Can't open file for writing.\n");
+        MPI_Abort( MPI_COMM_WORLD, 911 );
+        MPI_Finalize();
+    }
 
     if(readParameters( xlength, &tau, bddParams, &iProc, &jProc, &kProc, &timesteps, &timestepsPerPlotting, problem, pgmInput, argc, argv ) == 0)
     {
@@ -114,8 +122,9 @@ int main(int argc, char *argv[])
 
             treatBoundary(collideField, flagField, bddParams, local_xlength);
 
-//            if (t % timestepsPerPlotting == 0)
+            if (t % timestepsPerPlotting == 0)
 //                writeVtkOutput(collideField, flagField, "./Paraview/output", (unsigned int) t / timestepsPerPlotting, xlength, local_xlength, rank, iCoord, jCoord, kCoord, iProc, jProc, kProc);
+	          MPI_writeVtkOutput( &fh, collideField, flagField, local_xlength, iCoord, jCoord, kCoord, iProc, jProc, kProc, xlength);		
 
             if (!rank)
             {
@@ -191,7 +200,7 @@ int main(int argc, char *argv[])
         free(streamField);
         free(flagField);
     }
-
+    MPI_File_close(&fh);
     MPI_Finalize();
     return 0;
 }

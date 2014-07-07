@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <mpi.h>
 #include "helper.h"
 #include "visualLB.h"
 #include "computeCellValues.h"
@@ -112,4 +113,53 @@ void writeVtkOutput(const double * const collideField, const int * const flagFie
         ERROR( szBuff );
     }
 }
+
+
+void MPI_writeVtkOutput( MPI_File *fh, const double * const collideField, const int * const flagField, int * local_xlength,
+			 int iCoord, int jCoord, int kCoord, int iProc, int jProc, int kProc, int *xlength)
+{
+
+    double *dataset = (double*) malloc( (size_t)(local_xlength[0] * local_xlength[1] * local_xlength[2] * 7) * sizeof(double));
+
+    double originX, originY, originZ;
+
+    int x, y, z, i = 0, currentCellIndex;
+
+    double cellDensity, cellVelocity[3];
+
+    MPI_Status status;
+
+    originX = (double) iCoord * (xlength[0]/iProc);
+    originY = (double) jCoord * (xlength[1]/jProc) ;
+    originZ = (double) kCoord * (xlength[2]/kProc);
+
+    for(z = 1; z <= local_xlength[2]; z++)
+        for(y = 1; y <= local_xlength[1]; y++)
+            for ( x = 1; x <= local_xlength[0]; x++){
+
+                currentCellIndex = (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x);
+
+                computeDensity(collideField + currentCellIndex, &cellDensity, (local_xlength[0] + 2) * (local_xlength[1] + 2) * (local_xlength[2] + 2));
+                computeVelocity(collideField + currentCellIndex, &cellDensity, cellVelocity, (local_xlength[0] + 2) * (local_xlength[1] + 2) * (local_xlength[2] + 2));
+
+                dataset[i] = originX + (double)x;
+                dataset[i+1] = originY + (double)y;
+                dataset[i+2] = originZ + (double)z;
+
+                dataset[i+3] = cellVelocity[0];
+                dataset[i+4] = cellVelocity[1];
+                dataset[i+5] = cellVelocity[2];
+
+                dataset[i+6] = cellDensity;
+
+                i = i + 7;
+
+            }
+                
+    MPI_File_write_shared( *fh, dataset, local_xlength[0] * local_xlength[1] * local_xlength[2] * 7, MPI_DOUBLE, &status);
+
+}
+
+
+
 

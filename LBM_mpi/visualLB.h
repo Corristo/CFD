@@ -8,6 +8,8 @@
 void writeVtkOutput(const double * const collideField, const int * const flagField, const char * filename, unsigned int t, int *xlength, int * local_xlength, int rank, int iCoord, int jCoord, int kCoord, int iProc, int jProc, int kProc);
 void write_vtkPointCoordinates( FILE *fp, int *xlength, int * local_xlength, int iCoord, int jCoord, int kCoord, int iProc, int jProc, int kProc);
 void write_vtkHeader( FILE *fp, int * local_xlength);
+void MPI_writeVtkOutput( MPI_File *fh, const double * const collideField, const int * const flagField, int * local_xlength,
+			 int iCoord, int jCoord, int kCoord, int iProc, int jProc, int kProc, int *);
 
 
 #endif
