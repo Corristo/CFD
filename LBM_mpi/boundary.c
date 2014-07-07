@@ -1,6 +1,8 @@
 #include "boundary.h"
 #include "LBDefinitions.h"
 #include "computeCellValues.h"
+#include <omp.h>
+#include "communication.h"
 
 /**
  *  The array bddParams has the following structure
@@ -13,241 +15,2735 @@
  *  bddParams[6]   Moving wall velocity in z direction
  */
 
-void treatBoundary(double *collideField, int* flagField, const double * const bddParams, int *xlength)
+void treatBoundary(double *collideField, int* flagField, const double * const bddParams, int *xlength, const int iProc, const int jProc, const int kProc)
 {
-    int i, x, y, z;
-    #ifdef _ARBITRARYGEOMETRY_
-    int neighbourCoordX, neighbourCoordY, neighbourCoordZ, currentCellIndex, neighbourCellIndex;
-    #endif // _ARBITRARYGEOMETRY_
-    int coordinate[3];
-    int freeSlipNeighbours[3];
+    int i, x, y, z, neighbourCoordX, neighbourCoordY, neighbourCoordZ, currentCellIndex, neighbourCellIndex;
+    const double * const wallVelocity = bddParams + 4;
+    double density = 0.0;
+    int iCoord, jCoord, kCoord;
+
+    computePosition(iProc, jProc, kProc, &iCoord, &jCoord, &kCoord);
+
+#ifdef _ARBITRARYGEOMETRIES_
+    const double pressureIn = bddParams[3];
+    double velocity[3];
+    double feq[PARAMQ];
     double referenceDensity = 1.0;
-    double inflowFeq[PARAMQ] __attribute__((aligned(32)));
+    double inflowFeq[PARAMQ];
     computeFeq(&referenceDensity, bddParams, inflowFeq);
+#endif // _ARBITRARYGEOMETRIES_
 
-    #ifdef _ARBITRARYGEOMETRY_
-    #pragma omp parallel private(neighbourCoordX, neighbourCoordY, neighbourCoordZ, currentCellIndex, neighbourCellIndex, x,y,z,i,coordinate,freeSlipNeighbours), firstprivate(referenceDensity), shared(collideField, flagField, xlength, inflowFeq)
-    #else
-    #pragma omp parallel private(x,y,z,i,coordinate,freeSlipNeighbours), firstprivate(referenceDensity), shared(collideField, flagField, xlength, inflowFeq)
-    #endif // _ARBITRARYGEOMETRY_
+#ifdef _ARBITRARYGEOMETRIES_
+    #pragma omp parallel default(none) private(i, x, y, z, neighbourCoordX, neighbourCoordY, neighbourCoordZ, currentCellIndex, neighbourCellIndex, density, velocity, feq) shared(inflowFeq, referenceDensity, collideField, flagField, xlength, iCoord, jCoord, kCoord)
+#else
+    #pragma omp parallel default(none) private(i, x, y, z, neighbourCoordX, neighbourCoordY, neighbourCoordZ, currentCellIndex, neighbourCellIndex, density) shared(collideField, flagField, xlength, iCoord, jCoord, kCoord)
+#endif // _ARBITRARYGEOMETRIES_
     {
-    y = coordinate[1] = xlength[1] + 1;
-    freeSlipNeighbours[1] = xlength[1];
-    #pragma omp for nowait schedule(static)
-    for (i = 0; i < 5; i++)
-        for (z = 0; z <= xlength[2] + 1; z++)
-            for (x = 0; x <= xlength[0] + 1; x++)
-            {
-                coordinate[0] = freeSlipNeighbours[0] = x;
-                coordinate[2] = freeSlipNeighbours[2] = z;
-                compute_boundary(collideField, bddParams, flagField, xlength, VELOCITIESBOTTOMOUT[i], coordinate, freeSlipNeighbours, VELOCITIESTOPOUT[i], inflowFeq);
-            }
+#ifndef _ARBITRARYGEOMETRIES_
+    if (iCoord == 0)
+#endif // _ARBITRARYGEOMETRIES_
+    {
 
-    /* back boundary */
-    // i = 14,15,16,17,18
-    z = coordinate[2] = 0;
-    freeSlipNeighbours[2] = 1;
-    #pragma omp for nowait schedule(static)
-    for (i = 0; i < 5; i++)
-        for (y = 0; y <= xlength[1] + 1; y++)
-            for (x = 0; x <= xlength[0] + 1; x++)
-            {
-                coordinate[0] = freeSlipNeighbours[0] = x;
-                coordinate[1] = freeSlipNeighbours[1] = y;
-                compute_boundary(collideField, bddParams, flagField, xlength, VELOCITIESFRONTOUT[i], coordinate, freeSlipNeighbours, VELOCITIESBACKOUT[i], inflowFeq);
-
-            }
-
-
-    /* bottom boundary */
-    // i = 4, 11, 12, 13, 18
-    y = coordinate[1] = 0;
-    freeSlipNeighbours[1] = 1;
-    #pragma omp for nowait schedule(static)
-    for (i = 0; i < 5; i++)
-        for (z = 0; z <= xlength[2] + 1; z++)
-            for (x = 0; x <= xlength[0] + 1; x++)
-            {
-                coordinate[0] = freeSlipNeighbours[0] = x;
-                coordinate[2] = freeSlipNeighbours[2] = z;
-                compute_boundary(collideField, bddParams, flagField, xlength, VELOCITIESTOPOUT[i], coordinate, freeSlipNeighbours, VELOCITIESBOTTOMOUT[i], inflowFeq);
-            }
-
-    /* left boundary */
-    // i = 3, 7 ,10, 13, 17
-    coordinate[0] = x = 0;
-    freeSlipNeighbours[0] = 1;
-    #pragma omp for nowait schedule(static)
-    for (i = 0; i < 5; i++)
+        /* left boundary */
+        #pragma omp for nowait schedule(static)
         for (z = 0; z <= xlength[2] + 1; z++)
             for (y = 0; y <= xlength[1] + 1; y++)
-            {
-                coordinate[1] = freeSlipNeighbours[1] = y;
-                coordinate[2] = freeSlipNeighbours[2] = z;
-                compute_boundary(collideField, bddParams, flagField, xlength, VELOCITIESRIGHTOUT[i], coordinate, freeSlipNeighbours, VELOCITIESLEFTOUT[i], inflowFeq);
-            }
+#ifdef _ARBITRARYGEOMETRIES_
+                switch(flagField[(xlength[0] + 2) * y + (xlength[0] + 2) * (xlength[1] + 2) * z])
+                {
+                case NO_SLIP:
+#endif // _ARBITRARYGEOMETRIES_
+                {
+                    i = 3;
+                    neighbourCoordX = 1;
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if (neighbourCoordY >= 0 && neighbourCoordZ >= 0 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+#ifdef _ARBITRARYGEOMETRIES_
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+#endif // _ARBITRARYGEOMETRIES_
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
 
-    /* right boundary */
-    // i = 1,5,8,11,15
-    coordinate[0] = x = xlength[0] + 1;
-    freeSlipNeighbours[0] = xlength[0];
-    #pragma omp for nowait schedule(static)
-    for (i = 0; i < 5; i++)
+                    i = 7;
+                    neighbourCoordX = 1;
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if (neighbourCoordY >= 0 && neighbourCoordZ >= 0 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+#ifdef _ARBITRARYGEOMETRIES_
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+#endif // _ARBITRARYGEOMETRIES_
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
+
+                    i = 10;
+                    neighbourCoordX = 1;
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if (neighbourCoordY >= 0 && neighbourCoordZ >= 0 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+#ifdef _ARBITRARYGEOMETRIES_
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+#endif // _ARBITRARYGEOMETRIES_
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
+
+                    i = 13;
+                    neighbourCoordX = 1;
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if (neighbourCoordY >= 0 && neighbourCoordZ >= 0 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+#ifdef _ARBITRARYGEOMETRIES_
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+#endif // _ARBITRARYGEOMETRIES_
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
+
+                    i = 17;
+                    neighbourCoordX = 1;
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if (neighbourCoordY >= 0 && neighbourCoordZ >= 0 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+#ifdef _ARBITRARYGEOMETRIES_
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+#endif // _ARBITRARYGEOMETRIES_
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
+#ifdef _ARBITRARYGEOMETRIES_
+                    break;
+#endif // _ARBITRARYGEOMETRIES_
+                }
+#ifdef _ARBITRARYGEOMETRIES_
+                case MOVING_WALL:
+                {
+                    i = 3;
+                    neighbourCoordX = 1;
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if (neighbourCoordY >= 0 && neighbourCoordZ >= 0 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+
+                    i = 7;
+                    neighbourCoordX = 1;
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if (neighbourCoordY >= 0 && neighbourCoordZ >= 0 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+
+                    i = 10;
+                    neighbourCoordX = 1;
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if (neighbourCoordY >= 0 && neighbourCoordZ >= 0 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+
+                    i = 13;
+                    neighbourCoordX = 1;
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if (neighbourCoordY >= 0 && neighbourCoordZ >= 0 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+
+                    i = 17;
+                    neighbourCoordX = 1;
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if (neighbourCoordY >= 0 && neighbourCoordZ >= 0 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+                    break;
+                }
+                case INFLOW:
+                {
+                    i = 3;
+                    neighbourCoordX = 1;
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if (neighbourCoordY >= 0 && neighbourCoordZ >= 0 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+
+                    i = 7;
+                    neighbourCoordX = 1;
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if (neighbourCoordY >= 0 && neighbourCoordZ >= 0 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+
+                    i = 10;
+                    neighbourCoordX = 1;
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if (neighbourCoordY >= 0 && neighbourCoordZ >= 0 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+
+                    i = 13;
+                    neighbourCoordX = 1;
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if (neighbourCoordY >= 0 && neighbourCoordZ >= 0 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+
+                    i = 17;
+                    neighbourCoordX = 1;
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if (neighbourCoordY >= 0 && neighbourCoordZ >= 0 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+                    break;
+                }
+                case OUTFLOW:
+                {
+                    i = 3;
+                    neighbourCoordX = 1;
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if (neighbourCoordY >= 0 && neighbourCoordZ >= 0 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 7;
+                    neighbourCoordX = 1;
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if (neighbourCoordY >= 0 && neighbourCoordZ >= 0 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 10;
+                    neighbourCoordX = 1;
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if (neighbourCoordY >= 0 && neighbourCoordZ >= 0 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 13;
+                    neighbourCoordX = 1;
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if (neighbourCoordY >= 0 && neighbourCoordZ >= 0 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 17;
+                    neighbourCoordX = 1;
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if (neighbourCoordY >= 0 && neighbourCoordZ >= 0 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+                    break;
+                }
+                case PRESSURE_IN:
+                {
+                    i = 3;
+                    neighbourCoordX = 1;
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if (neighbourCoordY >= 0 && neighbourCoordZ >= 0 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 7;
+                    neighbourCoordX = 1;
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if (neighbourCoordY >= 0 && neighbourCoordZ >= 0 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 10;
+                    neighbourCoordX = 1;
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if (neighbourCoordY >= 0 && neighbourCoordZ >= 0 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 13;
+                    neighbourCoordX = 1;
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if (neighbourCoordY >= 0 && neighbourCoordZ >= 0 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 17;
+                    neighbourCoordX = 1;
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if (neighbourCoordY >= 0 && neighbourCoordZ >= 0 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+                    break;
+                }
+                case FREE_SLIP:
+                {
+                    if (!flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + 1])
+                    {
+                        neighbourCoordX = 1;
+                        neighbourCoordY = y;
+                        neighbourCoordZ = z;
+
+                        i = 3;
+                        currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 1;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                        i = 7;
+                        currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 5;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                        i = 10;
+                        currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 8;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                        i = 13;
+                        currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 11;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                        i = 17;
+                        currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 15;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                    }
+                    else if (flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + 1] == NO_SLIP)
+                    {
+                        // here the cell has to behave like a NO_SLIP cell
+                        i = 3;
+                        neighbourCoordX = 1;
+                        neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                        neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                        if (neighbourCoordY >= 0 && neighbourCoordZ >= 0 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                            if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                            {
+                                currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                                neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                                collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                            }
+
+                        i = 7;
+                        neighbourCoordX = 1;
+                        neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                        neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                        if (neighbourCoordY >= 0 && neighbourCoordZ >= 0 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                            if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                            {
+                                currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                                neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                                collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                            }
+
+                        // i = 10 is not needed since we already know that there is a bdd and not a fluid cell
+                        i = 13;
+                        neighbourCoordX = 1;
+                        neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                        neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                        if (neighbourCoordY >= 0 && neighbourCoordZ >= 0 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                            if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                            {
+                                currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                                neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                                collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                            }
+
+                        i = 17;
+                        neighbourCoordX = 1;
+                        neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                        neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                        if (neighbourCoordY >= 0 && neighbourCoordZ >= 0 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                            if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                            {
+                                currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2)) + i;
+                                neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                                collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                            }
+                    }
+                    break;
+                }
+                }
+#endif // _ARBITRARYGEOMETRIES_
+    }
+
+#ifndef _ARBITRARYGEOMETRIES_
+    if (iCoord == iProc - 1)
+#endif // _ARBITRARYGEOMETRIES_
+    {
+        /* right boundary */
+        #pragma omp for nowait schedule(static)
         for (z = 0; z <= xlength[2] + 1; z++)
             for (y = 0; y <= xlength[1] + 1; y++)
-            {
-                coordinate[1] = freeSlipNeighbours[1] = y;
-                coordinate[2] = freeSlipNeighbours[2] = z;
-                compute_boundary(collideField, bddParams, flagField, xlength, VELOCITIESLEFTOUT[i], coordinate, freeSlipNeighbours, VELOCITIESRIGHTOUT[i], inflowFeq);
-            }
+#ifdef _ARBITRARYGEOMETRIES_
+                switch(flagField[(xlength[0] + 1) + (xlength[0] + 2) * y + (xlength[0] + 2) * (xlength[1] + 2) * z])
+                {
+                case NO_SLIP:
+#endif // _ARBITRARYGEOMETRIES_
+                {
+                    i = 1;
+                    neighbourCoordX = xlength[0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+#ifdef _ARBITRARYGEOMETRIES_
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+#endif // _ARBITRARYGEOMETRIES_
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
 
-    /* front boundary, i.e. z = xlength + 1 */
-    // i=0,1,2,3,4
-    z = coordinate[2] = xlength[2] + 1;
-    freeSlipNeighbours[2] = xlength[2];
-    #pragma omp for nowait schedule(static)
-    for (i = 0; i < 5; i++)
+                    i = 5;
+                    neighbourCoordX = xlength[0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+#ifdef _ARBITRARYGEOMETRIES_
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+#endif // _ARBITRARYGEOMETRIES_
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
+
+                    i = 8;
+                    neighbourCoordX = xlength[0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+#ifdef _ARBITRARYGEOMETRIES_
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+#endif // _ARBITRARYGEOMETRIES_
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
+
+                    i = 11;
+                    neighbourCoordX = xlength[0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+#ifdef _ARBITRARYGEOMETRIES_
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+#endif // _ARBITRARYGEOMETRIES_
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
+
+                    i = 15;
+                    neighbourCoordX = xlength[0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+#ifdef _ARBITRARYGEOMETRIES_
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+#endif // _ARBITRARYGEOMETRIES_
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
+#ifdef _ARBITRARYGEOMETRIES_
+                    break;
+#endif // _ARBITRARYGEOMETRIES_
+                }
+#ifdef _ARBITRARYGEOMETRIES_
+                case MOVING_WALL:
+                {
+                    i = 1;
+                    neighbourCoordX = xlength[0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+
+                    i = 5;
+                    neighbourCoordX = xlength[0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+
+                    i = 8;
+                    neighbourCoordX = xlength[0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+
+                    i = 11;
+                    neighbourCoordX = xlength[0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+
+                    i = 15;
+                    neighbourCoordX = xlength[0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+                    break;
+                }
+                case INFLOW:
+                {
+                    i = 1;
+                    neighbourCoordX = xlength[0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+
+                    i = 5;
+                    neighbourCoordX = xlength[0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+
+                    i = 8;
+                    neighbourCoordX = xlength[0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+
+                    i = 11;
+                    neighbourCoordX = xlength[0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+
+                    i = 15;
+                    neighbourCoordX = xlength[0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+                    break;
+                }
+                case OUTFLOW:
+                {
+                    i = 1;
+                    neighbourCoordX = xlength[0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 5;
+                    neighbourCoordX = xlength[0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 8;
+                    neighbourCoordX = xlength[0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 11;
+                    neighbourCoordX = xlength[0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 15;
+                    neighbourCoordX = xlength[0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+                    break;
+                }
+                case PRESSURE_IN:
+                {
+                    i = 1;
+                    neighbourCoordX = xlength[0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 5;
+                    neighbourCoordX = xlength[0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 8;
+                    neighbourCoordX = xlength[0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 11;
+                    neighbourCoordX = xlength[0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 15;
+                    neighbourCoordX = xlength[0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+                    break;
+                }
+                case FREE_SLIP:
+                {
+                    if (!flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + xlength[0]])
+                    {
+                        neighbourCoordX = xlength[0];
+                        neighbourCoordY = y;
+                        neighbourCoordZ = z;
+
+                        i = 1;
+                        currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 3;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                        i = 5;
+                        currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 7;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                        i = 8;
+                        currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 10;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                        i = 11;
+                        currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 13;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                        i = 15;
+                        currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + (xlength[0] + 1)) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 17;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                    }
+                    break;
+                }
+                }
+#endif // _ARBITRARYGEOMETRIES_
+    }
+
+#ifndef _ARBITRARYGEOMETRIES_
+    if (kCoord == kProc - 1)
+#endif // _ARBITRARYGEOMETRIES_
+    {
+        /* front boundary, i.e. z = xlength + 1 */
+        #pragma omp for nowait schedule(static)
         for (y = 0; y <= xlength[1] + 1; y++)
             for (x = 0; x <= xlength[0] + 1; x++)
-            {
-                coordinate[0] = freeSlipNeighbours[0] = x;
-                coordinate[1] = freeSlipNeighbours[1] = y;
-                compute_boundary(collideField, bddParams, flagField, xlength, VELOCITIESBACKOUT[i], coordinate, freeSlipNeighbours, VELOCITIESFRONTOUT[i], inflowFeq);
-            }
+#ifdef _ARBITRARYGEOMETRIES_
+                switch(flagField[x + (xlength[0] + 2) * y + (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 1)])
+                {
+                case NO_SLIP:
+#endif // _ARBITRARYGEOMETRIES_
+                {
+                    i = 0;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = xlength[2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+#ifdef _ARBITRARYGEOMETRIES_
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+#endif // _ARBITRARYGEOMETRIES_
+                        {
+                            currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
 
-    /* inner boundary cells
-     * assumes inner boundary cells can only be NO_SLIP */
-     #ifdef _ARBITRARYGEOMETRY_
-     #pragma omp for nowait schedule(static)
-    for (i = 0; i < PARAMQ; i++)
+                    i = 1;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = xlength[2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+#ifdef _ARBITRARYGEOMETRIES_
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+#endif // _ARBITRARYGEOMETRIES_
+                        {
+                            currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
+
+                    i = 2;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = xlength[2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+#ifdef _ARBITRARYGEOMETRIES_
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+#endif // _ARBITRARYGEOMETRIES_
+                        {
+                            currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
+
+                    i = 3;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = xlength[2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+#ifdef _ARBITRARYGEOMETRIES_
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+#endif // _ARBITRARYGEOMETRIES_
+                        {
+                            currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
+
+                    i = 4;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = xlength[2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+#ifdef _ARBITRARYGEOMETRIES_
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+#endif // _ARBITRARYGEOMETRIES_
+                        {
+                            currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
+#ifdef _ARBITRARYGEOMETRIES_
+                    break;
+#endif // _ARBITRARYGEOMETRIES_
+                }
+#ifdef _ARBITRARYGEOMETRIES_
+                case MOVING_WALL:
+                {
+                    i = 0;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = xlength[2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+
+                    i = 1;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = xlength[2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+
+                    i = 2;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = xlength[2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+
+                    i = 3;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = xlength[2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+
+                    i = 4;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = xlength[2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+                    break;
+                }
+                case INFLOW:
+                {
+                    i = 0;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = xlength[2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+
+                    i = 1;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = xlength[2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+
+                    i = 2;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = xlength[2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+
+                    i = 3;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = xlength[2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+
+                    i = 4;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = xlength[2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+                    break;
+                }
+                case OUTFLOW:
+                {
+                    i = 0;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = xlength[2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 1;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = xlength[2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 2;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = xlength[2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 3;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = xlength[2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 4;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = xlength[2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+                    break;
+                }
+                case PRESSURE_IN:
+                {
+                    i = 0;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = xlength[2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 1;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = xlength[2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 2;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = xlength[2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 3;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = xlength[2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 4;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = xlength[2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+                    break;
+                }
+                case FREE_SLIP:
+                {
+                    if (!flagField[xlength[2] * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x])
+                    {
+                        neighbourCoordX = x;
+                        neighbourCoordY = y ;
+                        neighbourCoordZ = xlength[2];
+
+                        i = 0;
+                        currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 14;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                        i = 1;
+                        currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 15;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                        i = 2;
+                        currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 16;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                        i = 3;
+                        currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 17;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                        i = 4;
+                        currentCellIndex = PARAMQ * ((xlength[2] + 1) * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 18;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                    }
+                    break;
+                }
+                }
+#endif // _ARBITRARYGEOMETRIES_
+    }
+
+#ifndef _ARBITRARYGEOMETRIES_
+    if (kCoord == 0)
+#endif // _ARBITRARYGEOMETRIES_
+    {
+        /* back boundary */
+        z = 0;
+        #pragma omp for nowait schedule(static)
+        for (y = 0; y <= xlength[1] + 1; y++)
+            for (x = 0; x <= xlength[0] + 1; x++)
+#ifdef _ARBITRARYGEOMETRIES_
+                switch(flagField[x + (xlength[0] + 2) * y])
+                {
+                case NO_SLIP:
+#endif // _ARBITRARYGEOMETRIES_
+                {
+                    i = 14;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = 1;
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+#ifdef _ARBITRARYGEOMETRIES_
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+#endif // _ARBITRARYGEOMETRIES_
+                        {
+                            currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
+
+                    i = 15;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = 1;
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+#ifdef _ARBITRARYGEOMETRIES_
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+#endif // _ARBITRARYGEOMETRIES_
+                        {
+                            currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
+
+                    i = 16;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = 1;
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+#ifdef _ARBITRARYGEOMETRIES_
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+#endif // _ARBITRARYGEOMETRIES_
+                        {
+                            currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
+
+                    i = 17;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = 1;
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+#ifdef _ARBITRARYGEOMETRIES_
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+#endif // _ARBITRARYGEOMETRIES_
+                        {
+                            currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
+
+                    i = 18;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = 1;
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+#ifdef _ARBITRARYGEOMETRIES_
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+#endif // _ARBITRARYGEOMETRIES_
+                        {
+                            currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
+#ifdef _ARBITRARYGEOMETRIES_
+                    break;
+#endif // _ARBITRARYGEOMETRIES_
+                }
+#ifdef _ARBITRARYGEOMETRIES_
+                case MOVING_WALL:
+                {
+                    i = 14;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = 1;
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+
+                    i = 15;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = 1;
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+
+                    i = 16;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = 1;
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+
+                    i = 17;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = 1;
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+
+                    i = 18;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = 1;
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+                    break;
+                }
+                case INFLOW:
+                {
+                    i = 14;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = 1;
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+
+                    i = 15;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = 1;
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+
+                    i = 16;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = 1;
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+
+                    i = 17;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = 1;
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+
+                    i = 18;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = 1;
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+                    break;
+                }
+                case OUTFLOW:
+                {
+                    i = 14;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = 1;
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 15;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = 1;
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 16;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = 1;
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 17;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = 1;
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 18;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = 1;
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+                    break;
+                }
+                case PRESSURE_IN:
+                {
+                    i = 14;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = 1;
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 15;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = 1;
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 16;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = 1;
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 17;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = 1;
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 18;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = 1;
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+                    break;
+                }
+                case FREE_SLIP:
+                {
+                    if (!flagField[(xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x])
+                    {
+                        neighbourCoordX = x;
+                        neighbourCoordY = y;
+                        neighbourCoordZ = 1;
+
+                        i = 14;
+                        currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 0;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                        i = 15;
+                        currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 1;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                        i = 16;
+                        currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 2;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                        i = 17;
+                        currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 3;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                        i = 18;
+                        currentCellIndex = PARAMQ * (y * (xlength[0] + 2) + x) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 4;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                    }
+                    break;
+                }
+                }
+#endif // _ARBITRARYGEOMETRIES_
+    }
+#ifndef _ARBITRARYGEOMETRIES_
+    if (jCoord == 0)
+#endif // _ARBITRARYGEOMETRIES_
+    {
+        /* bottom boundary */
+        #pragma omp for nowait schedule(static)
+        for (z = 0; z <= xlength[2] + 1; z++)
+            for (x = 0; x <= xlength[0] + 1; x++)
+#ifdef _ARBITRARYGEOMETRIES_
+                switch(flagField[x + (xlength[0] + 2) * (xlength[1] + 2) * z])
+                {
+                case NO_SLIP:
+#endif // _ARBITRARYGEOMETRIES_
+                {
+                    i = 4;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
+
+                    i = 11;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
+
+                    i = 12;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY =  LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
+
+                    i = 13;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
+
+                    i = 18;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
+#ifdef _ARBITRARYGEOMETRIES_
+                    break;
+#endif // _ARBITRARYGEOMETRIES_
+                }
+#ifdef _ARBITRARYGEOMETRIES_
+                case MOVING_WALL:
+                {
+                    i = 4;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+
+                    i = 11;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+
+                    i = 12;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+
+                    i = 13;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+
+                    i = 18;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+                    break;
+                }
+                case INFLOW:
+                {
+                    i = 4;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+
+                    i = 11;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+
+                    i = 12;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+
+                    i = 13;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+
+                    i = 18;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+                    break;
+                }
+                case OUTFLOW:
+                {
+                    i = 4;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 11;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 12;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 13;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 18;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+                    break;
+                }
+                case PRESSURE_IN:
+                {
+                    i = 4;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 11;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 12;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 13;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 18;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = LATTICEVELOCITIES[i][1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+                    break;
+                }
+                case FREE_SLIP:
+                {
+                    if (!flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + (xlength[0] + 2) + x])
+                    {
+                        neighbourCoordX = x;
+                        neighbourCoordY = 1;
+                        neighbourCoordZ = z;
+
+                        i = 4;
+                        currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 0;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                        i = 11;
+                        currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 5;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                        i = 12;
+                        currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 6;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                        i = 13;
+                        currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 7;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                        i = 18;
+                        currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + x) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 14;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                    }
+                    break;
+                }
+                }
+#endif // _ARBITRARYGEOMETRIES_
+    }
+
+#ifndef _ARBITRARYGEOMETRIES_
+    if (jCoord == jProc - 1)
+#endif // _ARBITRARYGEOMETRIES_
+    {
+        /* top boundary
+                * only need to set directions 0, 5, 6, 7, 14 */
+        #pragma omp for nowait schedule(static)
+        for (z = 0; z <= xlength[2] + 1; z++)
+            for (x = 0; x <= xlength[0] + 1; x++)
+#ifdef _ARBITRARYGEOMETRIES_
+                switch(flagField[x + (xlength[0] + 2) * (xlength[1] + 1) + (xlength[0] + 2) * (xlength[1] + 2) * z])
+                {
+                case NO_SLIP:
+                {
+                    i = 0;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = xlength[1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1  && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
+
+                    i = 5;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = xlength[1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1  && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
+
+                    i = 6;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = (xlength[1]);
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1  && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
+
+                    i = 7;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = (xlength[1]);
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1  && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
+
+                    i = 14;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = xlength[1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1  && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = collideField[neighbourCellIndex];
+                        }
+                    break;
+                }
+                case MOVING_WALL:
+#endif // _ARBITRARYGEOMETRIES_
+                {
+                    i = 0;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = xlength[1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1  && neighbourCoordZ <= xlength[2] + 1)
+#ifdef _ARBITRARYGEOMETRIES_
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+#endif // _ARBITRARYGEOMETRIES_
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+
+                    i = 5;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = xlength[1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1  && neighbourCoordZ <= xlength[2] + 1)
+#ifdef _ARBITRARYGEOMETRIES_
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+#endif // _ARBITRARYGEOMETRIES_
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+
+                    i = 6;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = xlength[1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1  && neighbourCoordZ <= xlength[2] + 1)
+#ifdef _ARBITRARYGEOMETRIES_
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+#endif // _ARBITRARYGEOMETRIES_
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+
+                    i = 7;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = xlength[1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1  && neighbourCoordZ <= xlength[2] + 1)
+#ifdef _ARBITRARYGEOMETRIES_
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+#endif // _ARBITRARYGEOMETRIES_
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+
+                    i = 14;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = xlength[1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1  && neighbourCoordZ <= xlength[2] + 1)
+#ifdef _ARBITRARYGEOMETRIES_
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+#endif // _ARBITRARYGEOMETRIES_
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
+                                                              + 2 * LATTICEWEIGHTS[i] * (LATTICEVELOCITIES[i][0] * wallVelocity[0] + LATTICEVELOCITIES[i][1] * wallVelocity[1] + LATTICEVELOCITIES[i][2] * wallVelocity[2]) * density / (C_S * C_S);
+                        }
+#ifdef _ARBITRARYGEOMETRIES_
+                    break;
+#endif // _ARBITRARYGEOMETRIES_
+                }
+#ifdef _ARBITRARYGEOMETRIES_
+                case INFLOW:
+                {
+                    i = 0;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = xlength[1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1  && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+
+                    i = 5;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = xlength[1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1  && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+
+                    i = 6;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = xlength[1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1  && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+
+                    i = 7;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = xlength[1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1  && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+
+                    i = 14;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = xlength[1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1  && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            collideField[currentCellIndex] = inflowFeq[i];
+                        }
+                    break;
+                }
+                case OUTFLOW:
+                {
+                    i = 0;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = xlength[1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1  && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 5;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = xlength[1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1  && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 6;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = xlength[1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1  && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 7;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = xlength[1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1  && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 14;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = xlength[1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1  && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            computeFeq(&referenceDensity, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+                    break;
+                }
+                case PRESSURE_IN:
+                {
+                    i = 0;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = xlength[1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1  && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 5;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = xlength[1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1  && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 6;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = xlength[1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1  && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 7;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = xlength[1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1  && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+
+                    i = 14;
+                    neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                    neighbourCoordY = xlength[1];
+                    neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
+                    if ((neighbourCoordX >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1  && neighbourCoordZ <= xlength[2] + 1)
+                        if (flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
+                        {
+                            currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                            neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
+                            density = 0.0;
+                            computeDensitySSE(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density);
+                            computeVelocity(collideField + PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity);
+                            density = referenceDensity + pressureIn;
+                            computeFeq(&density, velocity, feq);
+                            collideField[currentCellIndex] = feq[PARAMQ - i - 1] + feq[i] - collideField[neighbourCellIndex];
+                        }
+                    break;
+                }
+                case FREE_SLIP:
+                {
+                    if (!flagField[z * (xlength[0] + 2) * (xlength[1] + 2) + xlength[1] * (xlength[0] + 2) + x])
+                    {
+                        neighbourCoordX = x;
+                        neighbourCoordY = xlength[1];
+                        neighbourCoordZ = z;
+
+                        i = 0;
+                        currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 4;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                        i = 5;
+                        currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 11;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                        i = 6;
+                        currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 12;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                        i = 7;
+                        currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 13;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                        i = 14;
+                        currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + (xlength[1] + 1) * (xlength[0] + 2) + x) + i;
+                        neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + 18;
+                        collideField[currentCellIndex] = collideField[neighbourCellIndex];
+
+                    }
+                    break;
+                }
+                }
+#endif // _ARBITRARYGEOMETRIES_
+    }
+
+        /* inner boundary cells
+         * assumes inner boundary cells can only be NO_SLIP */
+#ifdef _ARBITRARYGEOMETRIES_
+        #pragma omp for nowait schedule(static)
         for (z = 1; z <= xlength[2]; z++)
             for (y = 1; y <= xlength[1]; y++)
                 for(x = 1; x <= xlength[0]; x++)
                     if (flagField[x + (xlength[0] + 2) * y + (xlength[0] + 2) * (xlength[1] + 2) * z])
-                    {
-                        neighbourCoordX = x + LATTICEVELOCITIES[i][0];
-                        neighbourCoordY = y + LATTICEVELOCITIES[i][1];
-                        neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
-                        if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1)
+                        for (i = 0; i < PARAMQ; i++)
+                        {
+                            neighbourCoordX = x + LATTICEVELOCITIES[i][0];
+                            neighbourCoordY = y + LATTICEVELOCITIES[i][1];
+                            neighbourCoordZ = z + LATTICEVELOCITIES[i][2];
                             if (!flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ])
                             {
-                                currentCellIndex = z * (xlength[0] + 2) * (xlength[1] + 2) + y * (xlength[0] + 2) + x + i * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
-                                neighbourCellIndex = neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX + (PARAMQ - 1 - i) * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
+                                currentCellIndex = PARAMQ * (z * (xlength[0] + 2 ) * (xlength[1] + 2) + y * (xlength[0] + 2) + x) + i;
+                                neighbourCellIndex = PARAMQ * (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - i);
                                 collideField[currentCellIndex] = collideField[neighbourCellIndex];
                             }
-                    }
-    #endif // _ARBITRARYGEOMETRY_
+
+                        }
+#endif
+    } // end parallel region
 }
-}
-
-/** boundary helper function */
-void compute_boundary(double *collideField, const double * const bddParams, int *flagField, int *xlength, const int directionToUpdate, int * const coordinate, int * const freeSlipNeighbours, const int freeSlipDirectionToCopy, const double * const inflowFeq)
-{
-    int neighbourCoordX, neighbourCoordY, neighbourCoordZ;
-    int currentCellIndex, neighbourCellIndex;
-    double density;
-    const double * const wallVelocity = bddParams + 4;
-    double referenceDensity = 1.0;
-    double feq[PARAMQ] __attribute__((aligned(32)));
-    double velocity[3];
-    const double pressureIn = bddParams[3];
-
-    int boundaryType = flagField[coordinate[0] + (xlength[0] + 2) * coordinate[1] + (xlength[0] + 2) * (xlength[1] + 2) * coordinate[2]];
-
-    switch (boundaryType)
-    {
-    case NO_SLIP:
-        neighbourCoordX = coordinate[0] + LATTICEVELOCITIES[directionToUpdate][0];
-        neighbourCoordY = coordinate[1] + LATTICEVELOCITIES[directionToUpdate][1];
-        neighbourCoordZ = coordinate[2] + LATTICEVELOCITIES[directionToUpdate][2];
-
-        if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1
-                && flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
-        {
-            currentCellIndex = (coordinate[2] * (xlength[0] + 2 ) * (xlength[1] + 2) + coordinate[1] * (xlength[0] + 2) + coordinate[0]) + directionToUpdate * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
-            neighbourCellIndex = (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - directionToUpdate) * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
-            collideField[currentCellIndex] = collideField[neighbourCellIndex];
-        }
-        break;
-    case MOVING_WALL:
-        neighbourCoordX = coordinate[0] + LATTICEVELOCITIES[directionToUpdate][0];
-        neighbourCoordY = coordinate[1] + LATTICEVELOCITIES[directionToUpdate][1];
-        neighbourCoordZ = coordinate[2] + LATTICEVELOCITIES[directionToUpdate][2];
-
-        if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1
-                && flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
-        {
-            currentCellIndex = (coordinate[2] * (xlength[0] + 2 ) * (xlength[1] + 2) + coordinate[1] * (xlength[0] + 2) + coordinate[0]) + directionToUpdate * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
-            neighbourCellIndex = (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - directionToUpdate) * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
-            computeDensity(collideField + (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2));
-
-            collideField[currentCellIndex] =  collideField[neighbourCellIndex]
-                                              + 2 * LATTICEWEIGHTS[directionToUpdate] * (LATTICEVELOCITIES[directionToUpdate][0] * wallVelocity[0]
-                                                      + LATTICEVELOCITIES[directionToUpdate][1] * wallVelocity[1] + LATTICEVELOCITIES[directionToUpdate][2] * wallVelocity[2]) * density / (C_S * C_S);
-        }
-        break;
-    case INFLOW:
-        neighbourCoordX = coordinate[0] + LATTICEVELOCITIES[directionToUpdate][0];
-        neighbourCoordY = coordinate[1] + LATTICEVELOCITIES[directionToUpdate][1];
-        neighbourCoordZ = coordinate[2] + LATTICEVELOCITIES[directionToUpdate][2];
-
-        if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1
-                && flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
-        {
-            currentCellIndex = (coordinate[2] * (xlength[0] + 2 ) * (xlength[1] + 2) + coordinate[1] * (xlength[0] + 2) + coordinate[0]) + directionToUpdate * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
-            neighbourCellIndex = (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - directionToUpdate) * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
-            collideField[currentCellIndex] = inflowFeq[directionToUpdate];
-        }
-
-        break;
-
-    case OUTFLOW:
-        neighbourCoordX = coordinate[0] + LATTICEVELOCITIES[directionToUpdate][0];
-        neighbourCoordY = coordinate[1] + LATTICEVELOCITIES[directionToUpdate][1];
-        neighbourCoordZ = coordinate[2] + LATTICEVELOCITIES[directionToUpdate][2];
-
-        if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1
-                && flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
-        {
-            currentCellIndex = (coordinate[2] * (xlength[0] + 2 ) * (xlength[1] + 2) + coordinate[1] * (xlength[0] + 2) + coordinate[0]) + directionToUpdate * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
-            neighbourCellIndex = (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - directionToUpdate) * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
-            computeDensity(collideField + (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2));
-            computeVelocity(collideField + (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity, (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2));
-            computeFeq(&referenceDensity, velocity, feq);
-            collideField[currentCellIndex] = feq[PARAMQ - directionToUpdate - 1] + feq[directionToUpdate] - collideField[neighbourCellIndex];
-        }
-        break;
-    case PRESSURE_IN:
-        neighbourCoordX = coordinate[0] + LATTICEVELOCITIES[directionToUpdate][0];
-        neighbourCoordY = coordinate[1] + LATTICEVELOCITIES[directionToUpdate][1];
-        neighbourCoordZ = coordinate[2] + LATTICEVELOCITIES[directionToUpdate][2];
-
-        if ((neighbourCoordX >= 0) && (neighbourCoordY >= 0) && (neighbourCoordZ >= 0) && neighbourCoordX <= xlength[0] + 1 && neighbourCoordY <= xlength[1] + 1 && neighbourCoordZ <= xlength[2] + 1
-                && flagField[neighbourCoordX + (xlength[0] + 2) * neighbourCoordY + (xlength[0] + 2) * (xlength[1] + 2) * neighbourCoordZ] == 0)
-        {
-            currentCellIndex = (coordinate[2] * (xlength[0] + 2 ) * (xlength[1] + 2) + coordinate[1] * (xlength[0] + 2) + coordinate[0]) + directionToUpdate * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
-            neighbourCellIndex = (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + (PARAMQ - 1 - directionToUpdate) * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
-            computeDensity(collideField +  (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2));
-            computeVelocity(collideField +  (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX), &density, velocity, (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2));
-            density = referenceDensity + pressureIn;
-            computeFeq(&density, velocity, feq);
-            collideField[currentCellIndex] = feq[PARAMQ - directionToUpdate - 1] + feq[directionToUpdate] - collideField[neighbourCellIndex];
-        }
-        break;
-    case FREE_SLIP:
-
-        neighbourCoordX = freeSlipNeighbours[0];
-        neighbourCoordY = freeSlipNeighbours[1];
-        neighbourCoordZ = freeSlipNeighbours[2];
-        if (!flagField[neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX])
-        {
-            currentCellIndex = (coordinate[2] * (xlength[0] + 2) * (xlength[1] + 2) + coordinate[1] * (xlength[0] + 2) + coordinate[0]) + directionToUpdate * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
-            neighbourCellIndex = (neighbourCoordZ * (xlength[0] + 2) * (xlength[1] + 2) + neighbourCoordY * (xlength[0] + 2) + neighbourCoordX) + freeSlipDirectionToCopy * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2);
-            collideField[currentCellIndex] = collideField[neighbourCellIndex];
-
-        }
-
-    }
-
-}
-

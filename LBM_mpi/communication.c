@@ -211,7 +211,6 @@ void getSendRecvCount( const int * const local_xlength, const int * const neighb
 void getSendRecvIndices( const int * const local_xlength, const int * const neighbours, const int * const flagField, int ** sendIndices, int ** recvIndices )
 {
     int x, y, z, i, x_send, x_recv, y_send, y_recv, z_send, z_recv, sendcounter, recvcounter;
-    int numberOfCells = (local_xlength[0] + 2) * (local_xlength[1] + 2) * (local_xlength[2] + 2);
 
     if (neighbours[0] >= 0)
     {
@@ -225,13 +224,13 @@ void getSendRecvIndices( const int * const local_xlength, const int * const neig
                     if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_send] == FREE_SLIP)
                         for (i = 0; i < 5; i++)
                         {
-                            sendIndices[0][sendcounter] = numberOfCells * VELOCITIESLEFTOUT[i] + (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_send);
+                            sendIndices[0][sendcounter] = PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_send) + VELOCITIESLEFTOUT[i];
                             sendcounter++;
                         }
                     if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_recv] == FREE_SLIP)
                         for (i = 0; i < 5; i++)
                         {
-                            recvIndices[0][recvcounter] = numberOfCells * VELOCITIESRIGHTOUT[i] + (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_recv);
+                            recvIndices[0][recvcounter] = PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_recv) + VELOCITIESRIGHTOUT[i];
                             recvcounter++;
                         }
                 }
@@ -240,13 +239,13 @@ void getSendRecvIndices( const int * const local_xlength, const int * const neig
                     if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_send] == FLUID)
                         for (i = 0; i < 5; i++)
                         {
-                            sendIndices[0][sendcounter] = numberOfCells * VELOCITIESLEFTOUT[i] + (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_send);
+                            sendIndices[0][sendcounter] = PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_send) + VELOCITIESLEFTOUT[i];
                             sendcounter++;
                         }
                     if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_recv] == PARALLEL_BOUNDARY)
                         for (i = 0; i < 5; i++)
                         {
-                            recvIndices[0][recvcounter] = numberOfCells * VELOCITIESRIGHTOUT[i] + (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_recv);
+                            recvIndices[0][recvcounter] = PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_recv) + VELOCITIESRIGHTOUT[i];
                             recvcounter++;
                         }
                 }
@@ -264,13 +263,13 @@ void getSendRecvIndices( const int * const local_xlength, const int * const neig
                     if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_send] == FREE_SLIP)
                         for (i = 0; i < 5; i++)
                         {
-                            sendIndices[1][sendcounter] = numberOfCells * VELOCITIESRIGHTOUT[i] + (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_send);
+                            sendIndices[1][sendcounter] = PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_send) + VELOCITIESRIGHTOUT[i];
                             sendcounter++;
                         }
                     if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_recv] == FREE_SLIP)
                         for (i = 0; i < 5; i++)
                         {
-                            recvIndices[1][recvcounter] = numberOfCells * VELOCITIESLEFTOUT[i] + (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_recv);
+                            recvIndices[1][recvcounter] = PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_recv) + VELOCITIESLEFTOUT[i];
                             recvcounter++;
                         }
                 }
@@ -279,13 +278,13 @@ void getSendRecvIndices( const int * const local_xlength, const int * const neig
                     if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_send] == FLUID)
                         for (i = 0; i < 5; i++)
                         {
-                            sendIndices[1][sendcounter] = numberOfCells * VELOCITIESRIGHTOUT[i] + (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_send);
+                            sendIndices[1][sendcounter] = PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_send) + VELOCITIESRIGHTOUT[i];
                             sendcounter++;
                         }
                     if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_recv] == PARALLEL_BOUNDARY)
                         for (i = 0; i < 5; i++)
                         {
-                            recvIndices[1][recvcounter] = numberOfCells * VELOCITIESLEFTOUT[i] + (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_recv);
+                            recvIndices[1][recvcounter] = PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x_recv) + VELOCITIESLEFTOUT[i];
                             recvcounter++;
                         }
                 }
@@ -302,13 +301,14 @@ void getSendRecvIndices( const int * const local_xlength, const int * const neig
                 if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_send * (local_xlength[0] + 2) + x] == FLUID || flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_send * (local_xlength[0] + 2) + x] == FREE_SLIP || flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_send * (local_xlength[0] + 2) + x] == PARALLEL_BOUNDARY)
                     for (i = 0; i < 5; i++)
                     {
-                        sendIndices[2][sendcounter] = numberOfCells * VELOCITIESTOPOUT[i] + (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_send * (local_xlength[0] + 2) + x);
+                        sendIndices[2][sendcounter] = PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_send * (local_xlength[0] + 2) + x) + VELOCITIESTOPOUT[i];
                         sendcounter++;
                     }
-                if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_recv * (local_xlength[0] + 2) + x] == PARALLEL_BOUNDARY || flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_recv * (local_xlength[0] + 2) + x] == FREE_SLIP )
+                if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_recv * (local_xlength[0] + 2) + x] == PARALLEL_BOUNDARY ||
+                    flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_recv * (local_xlength[0] + 2) + x] == FREE_SLIP )
                     for (i = 0; i < 5; i++)
                     {
-                        recvIndices[2][recvcounter] = numberOfCells * VELOCITIESBOTTOMOUT[i] + (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_recv * (local_xlength[0] + 2) + x);
+                        recvIndices[2][recvcounter] = PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_recv * (local_xlength[0] + 2) + x) + VELOCITIESBOTTOMOUT[i];
                         recvcounter++;
                     }
             }
@@ -325,13 +325,13 @@ void getSendRecvIndices( const int * const local_xlength, const int * const neig
                 if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_send * (local_xlength[0] + 2) + x] == FLUID || flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_send * (local_xlength[0] + 2) + x] == FREE_SLIP || flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_send * (local_xlength[0] + 2) + x] == PARALLEL_BOUNDARY)
                     for (i = 0; i < 5; i++)
                     {
-                        sendIndices[3][sendcounter] = numberOfCells * VELOCITIESBOTTOMOUT[i] + (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_send * (local_xlength[0] + 2) + x);
+                        sendIndices[3][sendcounter] = PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_send * (local_xlength[0] + 2) + x) + VELOCITIESBOTTOMOUT[i];
                         sendcounter++;
                     }
                 if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_recv * (local_xlength[0] + 2) + x] == PARALLEL_BOUNDARY || flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_recv * (local_xlength[0] + 2) + x] == FREE_SLIP )
                     for (i = 0; i < 5; i++)
                     {
-                        recvIndices[3][recvcounter] = numberOfCells * VELOCITIESTOPOUT[i] + (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_recv * (local_xlength[0] + 2) + x);
+                        recvIndices[3][recvcounter] = PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y_recv * (local_xlength[0] + 2) + x) + VELOCITIESTOPOUT[i];
                         recvcounter++;
                     }
             }
@@ -349,13 +349,13 @@ void getSendRecvIndices( const int * const local_xlength, const int * const neig
                     if (flagField[z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FREE_SLIP)
                         for (i = 0; i < 5; i++)
                         {
-                            sendIndices[4][sendcounter] = numberOfCells * VELOCITIESFRONTOUT[i] +  (z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x);
+                            sendIndices[4][sendcounter] = PARAMQ * (z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + VELOCITIESFRONTOUT[i];
                             sendcounter++;
                         }
                     if (flagField[z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FREE_SLIP)
                         for (i = 0; i < 5; i++)
                         {
-                            recvIndices[4][recvcounter] = numberOfCells * VELOCITIESBACKOUT[i] + (z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x);
+                            recvIndices[4][recvcounter] = PARAMQ * (z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + VELOCITIESBACKOUT[i];
                             recvcounter++;
                         }
                 }
@@ -364,13 +364,13 @@ void getSendRecvIndices( const int * const local_xlength, const int * const neig
                     if (flagField[z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FLUID || flagField[z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == PARALLEL_BOUNDARY || flagField[z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FREE_SLIP)
                         for (i = 0; i < 5; i++)
                         {
-                            sendIndices[4][sendcounter] = numberOfCells * VELOCITIESFRONTOUT[i] + (z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x);
+                            sendIndices[4][sendcounter] = PARAMQ * (z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + VELOCITIESFRONTOUT[i];
                             sendcounter++;
                         }
                     if (flagField[z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == PARALLEL_BOUNDARY || flagField[z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FREE_SLIP)
                         for (i = 0; i < 5; i++)
                         {
-                            recvIndices[4][recvcounter] = numberOfCells * VELOCITIESBACKOUT[i] + (z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x);
+                            recvIndices[4][recvcounter] = PARAMQ * (z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + VELOCITIESBACKOUT[i];
                             recvcounter++;
                         }
                 }
@@ -387,13 +387,13 @@ void getSendRecvIndices( const int * const local_xlength, const int * const neig
                     if (flagField[z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FREE_SLIP)
                         for (i = 0; i < 5; i++)
                         {
-                            sendIndices[5][sendcounter] = numberOfCells * VELOCITIESBACKOUT[i] + (z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x);
+                            sendIndices[5][sendcounter] = PARAMQ * (z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + VELOCITIESBACKOUT[i];
                             sendcounter++;
                         }
                     if (flagField[z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FREE_SLIP)
                         for (i = 0; i < 5; i++)
                         {
-                            recvIndices[5][recvcounter] = numberOfCells * VELOCITIESFRONTOUT[i] + (z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x);
+                            recvIndices[5][recvcounter] = PARAMQ * (z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + VELOCITIESFRONTOUT[i];
                             recvcounter++;
                         }
                 }
@@ -402,13 +402,13 @@ void getSendRecvIndices( const int * const local_xlength, const int * const neig
                     if (flagField[z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FLUID || flagField[z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == PARALLEL_BOUNDARY || flagField[z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FREE_SLIP)
                         for (i = 0; i < 5; i++)
                         {
-                            sendIndices[5][sendcounter] = numberOfCells * VELOCITIESBACKOUT[i] + (z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x);
+                            sendIndices[5][sendcounter] = PARAMQ * (z_send * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + VELOCITIESBACKOUT[i];
                             sendcounter++;
                         }
                     if (flagField[z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == PARALLEL_BOUNDARY || flagField[z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FREE_SLIP)
                         for (i = 0; i < 5; i++)
                         {
-                            recvIndices[5][recvcounter] = numberOfCells * VELOCITIESFRONTOUT[i] + (z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x);
+                            recvIndices[5][recvcounter] = PARAMQ * (z_recv * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + VELOCITIESFRONTOUT[i];
                             recvcounter++;
                         }
                 }

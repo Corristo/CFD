@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
     MPI_Datatype MPISendTypes[6], MPIRecvTypes[6];
     MPI_Request MPISendReq[2], MPIRecvReq[2];
 
-#ifdef _DEBUG_
+#ifdef DEBUG
     double * exactCollideField; // for debugging only
 #endif
 
@@ -85,9 +85,10 @@ int main(int argc, char *argv[])
         computeNeighbours( iProc, jProc, kProc, neighbours );
         initialiseMPITypes(local_xlength, neighbours, flagField, MPISendTypes, MPIRecvTypes);
 
-
+#ifndef _NOPROGRESS_
         if (!rank)
             printf("Progress:     ");
+#endif // _NOPROGRESS_
         PAPI_start_counters( PAPI_events, 3 );
         for(int t = 0; t < timesteps; t++)
         {
@@ -106,26 +107,31 @@ int main(int argc, char *argv[])
             doStreamingAndCollision(collideField, streamField, flagField, local_xlength, tau, 3);
             checkRequestCompletion(MPISendReq, MPIRecvReq, 1, neighbours);
 
-            doStreamingAndCollision(collideField, streamField, flagField, local_xlength, tau, 4);
 
+
+            doStreamingAndCollision(collideField, streamField, flagField, local_xlength, tau, 4);
+//            doStreaming(collideField, streamField, flagField, local_xlength);
             swap = collideField;
             collideField = streamField;
             streamField = swap;
+//            doCollision(collideField, flagField, &tau, local_xlength);
+            treatBoundary(collideField, flagField, bddParams, local_xlength, iProc, jProc, kProc);
 
-            treatBoundary(collideField, flagField, bddParams, local_xlength);
-
-//            if (t % timestepsPerPlotting == 0)
-//                writeVtkOutput(collideField, flagField, "./Paraview/output", (unsigned int) t / timestepsPerPlotting, xlength, local_xlength, rank, iCoord, jCoord, kCoord, iProc, jProc, kProc);
-
+#ifdef _VTK_
+            if (t % timestepsPerPlotting == 0)
+                writeVtkOutput(collideField, flagField, "./Paraview/output", (unsigned int) t / timestepsPerPlotting, xlength, local_xlength, rank, iCoord, jCoord, kCoord, iProc, jProc, kProc);
+#endif // _VTK_
+#ifndef _NOPROGRESS_
             if (!rank)
             {
                 int pct = ((float) t / timesteps) * 100;
                 printf("\b\b\b%02d%%", pct);
                 fflush(stdout);
             }
+#endif // _NOPROGRESS_
 
             /** debugging code: check collideField */
-#ifdef _DEBUG_
+#ifdef DEBUG
             // check correctness of collideField with reference data
             if (t % timestepsPerPlotting == 0)
             {
@@ -137,19 +143,23 @@ int main(int argc, char *argv[])
                 unsigned int line = 0;
                 int error = 0;
                 char szFileName[1200];
+                int noOfReadEntries;
                 sprintf( szFileName, "Testdata/%s/%i.dat", problem, t / timestepsPerPlotting );
                 fp = fopen(szFileName,"r");
                 if (fp != NULL)
                 {
                     for (line = 0; line < PARAMQ * (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2); line++)
-                        fscanf(fp,"%lf",&exactCollideField[line]);
-
+                    {
+                        noOfReadEntries = fscanf(fp,"%lf",&exactCollideField[line]);
+                        if (noOfReadEntries != 1)
+                            continue;
+                    }
                     for (z = 1; z <= local_xlength[2]; z++)
                         for (y = 1; y <= local_xlength[1]; y++)
                             for(x = 1; x <= local_xlength[0]; x++)
                                 for (i = 0; i < PARAMQ; i++)
                                     if (flagField[z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x] == FLUID)
-                                        if (fabs(collideField[(z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + i * (local_xlength[0] + 2) * (local_xlength[1] + 2) * (local_xlength[2] + 2)] - exactCollideField[PARAMQ * ((z + kCoord * (xlength[2] / kProc)) * (xlength[0] + 2) * (xlength[1] + 2) + (y + jCoord * (xlength[1]/jProc)) * (xlength[0] + 2) + (x + iCoord * (xlength[0] / iProc) )) + i]) > 1e-4)
+                                        if (fabs(collideField[PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x) + i] - exactCollideField[PARAMQ * ((z + kCoord * (xlength[2] / kProc)) * (xlength[0] + 2) * (xlength[1] + 2) + (y + jCoord * (xlength[1]/jProc)) * (xlength[0] + 2) + (x + iCoord * (xlength[0] / iProc) )) + i]) > 1e-5)
                                             error = 1;
                     if (error)
                         printf("ERROR: Process %d has a different collideField in timestep %d\n",rank, t);

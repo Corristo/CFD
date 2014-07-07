@@ -11,10 +11,10 @@
 #define PARALLEL_BOUNDARY 7
 #include <stdint.h>
 
-//#define _AVX_
-//#define _ARBITRARYGEOMETRY_
-//#define _DEBUG_
-
+//#define DEBUG   // check correctness by comparison with pregenerated test files
+//#define _ARBITRARYGEOMETRIES_   // Allows for scenarios other than driven cavity
+#define _NOPROGRESS_    // Set this flag to suppress the display of progress
+//#define _VTK_           // enables VTK output
 static const int VELOCITIESRIGHTOUT[5] = { 3, 7, 13, 17, 10 };
 static const int VELOCITIESLEFTOUT[5] = { 1, 5, 11, 15, 8 };
 static const int VELOCITIESBOTTOMOUT[5] = { 0, 5, 7, 14, 6 };

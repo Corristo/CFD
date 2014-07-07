@@ -73,9 +73,9 @@ void writeVtkOutput(const double * const collideField, const int * const flagFie
         for (y = 1; y <= local_xlength[1]; y++)
             for (x = 1; x <= local_xlength[0]; x++)
             {
-                currentCellIndex = (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x);
-                computeDensity(collideField + currentCellIndex, &cellDensity, (local_xlength[0] + 2) * (local_xlength[1] + 2) * (local_xlength[2] + 2));
-                computeVelocity(collideField + currentCellIndex, &cellDensity, cellVelocity, (local_xlength[0] + 2) * (local_xlength[1] + 2) * (local_xlength[2] + 2));
+                currentCellIndex = PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x);
+                computeDensitySSE(collideField + currentCellIndex, &cellDensity);
+                computeVelocity(collideField + currentCellIndex, &cellDensity, cellVelocity);
                 fprintf(fp, "%f %f %f\n", cellVelocity[0], cellVelocity[1], cellVelocity[2]);
             }
 
@@ -88,16 +88,16 @@ void writeVtkOutput(const double * const collideField, const int * const flagFie
         for(y = 1; y <= local_xlength[1]; y++)
             for (x = 1; x <= local_xlength[0]; x++)
             {
-                currentCellIndex = (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x);
-                computeDensity(collideField + currentCellIndex, &cellDensity, (local_xlength[0] + 2) * (local_xlength[1] + 2) * (local_xlength[2] + 2));
+                currentCellIndex = PARAMQ * (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x);
+                computeDensitySSE(collideField + currentCellIndex, &cellDensity);
                 fprintf(fp, "%f\n", cellDensity);
             }
 
 //    fprintf(fp, "SCALARS boundaryType integer 1 \n");
 //    fprintf(fp, "LOOKUP_TABLE default \n");
-//    for(z = 1; z <= local_xlength[2]; z++)
-//        for(y = 1; y <= local_xlength[1]; y++)
-//            for (x = 1; x <= local_xlength[0]; x++)
+//    for(z = 0; z <= local_xlength[2] + 1; z++)
+//        for(y = 0; y <= local_xlength[1] + 1; y++)
+//            for (x = 0; x <= local_xlength[0] + 1; x++)
 //            {
 //                currentCellIndex = (z * (local_xlength[0] + 2) * (local_xlength[1] + 2) + y * (local_xlength[0] + 2) + x);
 //                fprintf(fp, "%d\n", flagField[currentCellIndex]);
