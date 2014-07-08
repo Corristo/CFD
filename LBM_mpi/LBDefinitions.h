@@ -12,9 +12,11 @@
 #include <stdint.h>
 
 //#define DEBUG   // check correctness by comparison with pregenerated test files
-//#define _ARBITRARYGEOMETRIES_   // Allows for scenarios other than driven cavity
-#define _NOPROGRESS_    // Set this flag to suppress the display of progress
-//#define _VTK_           // enables VTK output
+#define _ARBITRARYGEOMETRIES_   // Allows for scenarios other than driven cavity
+//#define _NOPROGRESS_    // Set this flag to suppress the display of progress
+#define _VTK_           // enables VTK output
+//#define _VTK_BINARY_    // enables the use of MPI_IO to output a binary file of all collected outputs
+                          // which can later be converted to csv output
 static const int VELOCITIESRIGHTOUT[5] = { 3, 7, 13, 17, 10 };
 static const int VELOCITIESLEFTOUT[5] = { 1, 5, 11, 15, 8 };
 static const int VELOCITIESBOTTOMOUT[5] = { 0, 5, 7, 14, 6 };

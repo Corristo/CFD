@@ -12,7 +12,7 @@
 #include <unistd.h>
 #include <omp.h>
 #include <sys/time.h>
-#include <papi.h>
+//#include <papi.h>
 
 int main(int argc, char *argv[])
 {
@@ -25,15 +25,15 @@ int main(int argc, char *argv[])
     double time_spent;
     struct timeval time_start, time_end;
 
-    long long counters[3];
-    int PAPI_events[] =
-    {
-        PAPI_TOT_CYC,
-        PAPI_L2_DCM,
-        PAPI_L2_DCA
-    };
+//    long long counters[3];
+//    int PAPI_events[] =
+//    {
+//        PAPI_TOT_CYC,
+//        PAPI_L2_DCM,
+//        PAPI_L2_DCA
+//    };
 
-    PAPI_library_init(PAPI_VER_CURRENT);
+//    PAPI_library_init(PAPI_VER_CURRENT);
 
     int xlength[3], local_xlength[3], timesteps, timestepsPerPlotting;
     double tau, bddParams[7];
@@ -69,6 +69,14 @@ int main(int argc, char *argv[])
             MPI_Finalize();
             return -1;
         }
+        MPI_File fh;
+        int err = MPI_File_open( MPI_COMM_WORLD, "VTK.bin.data", MPI_MODE_RDWR | MPI_MODE_CREATE, MPI_INFO_NULL, &fh );
+        if (err)
+        {
+            fprintf(stderr, "Can't open file for writing.\n");
+            MPI_Abort( MPI_COMM_WORLD, 911 );
+            MPI_Finalize();
+        }
         begin = clock();
         gettimeofday(&time_start, NULL);
 
@@ -89,7 +97,7 @@ int main(int argc, char *argv[])
         if (!rank)
             printf("Progress:     ");
 #endif // _NOPROGRESS_
-        PAPI_start_counters( PAPI_events, 3 );
+//        PAPI_start_counters( PAPI_events, 3 );
         for(int t = 0; t < timesteps; t++)
         {
             double *swap = NULL;
@@ -107,19 +115,21 @@ int main(int argc, char *argv[])
             doStreamingAndCollision(collideField, streamField, flagField, local_xlength, tau, 3);
             checkRequestCompletion(MPISendReq, MPIRecvReq, 1, neighbours);
 
-
-
             doStreamingAndCollision(collideField, streamField, flagField, local_xlength, tau, 4);
-//            doStreaming(collideField, streamField, flagField, local_xlength);
+
             swap = collideField;
             collideField = streamField;
             streamField = swap;
-//            doCollision(collideField, flagField, &tau, local_xlength);
+
             treatBoundary(collideField, flagField, bddParams, local_xlength, iProc, jProc, kProc);
 
 #ifdef _VTK_
             if (t % timestepsPerPlotting == 0)
+#ifndef _VTK_BINARY_
                 writeVtkOutput(collideField, flagField, "./Paraview/output", (unsigned int) t / timestepsPerPlotting, xlength, local_xlength, rank, iCoord, jCoord, kCoord, iProc, jProc, kProc);
+#else
+                MPI_writeVtkOutput(&fh, collideField, flagField, local_xlength, iCoord, jCoord, kCoord, iProc, jProc, kProc, xlength);
+#endif // _VTK_BINARY_
 #endif // _VTK_
 #ifndef _NOPROGRESS_
             if (!rank)
@@ -178,10 +188,11 @@ int main(int argc, char *argv[])
 
 
         }
+        MPI_File_close(&fh);
         MPI_Barrier(MPI_COMM_WORLD);
         if (!rank)
         {
-            PAPI_read_counters( counters, 3 );
+//            PAPI_read_counters( counters, 3 );
             printf("\b\b\b\b100%%\n");
             end = clock();
             time_spent = (double) (end - begin) / CLOCKS_PER_SEC;
@@ -191,10 +202,10 @@ int main(int argc, char *argv[])
             printf("Running time (Wall clock): %.2fs\n", ( (double) (( time_end.tv_sec - time_start.tv_sec) * 1000000u + time_end.tv_usec - time_start.tv_usec) )/ 1e6);
             printf("MLUPS: %.3f\n", ((double) (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2) * timesteps) / (1000000.0 * ((time_end.tv_sec - time_start.tv_sec) * 1000000u + time_end.tv_usec - time_start.tv_usec) / 1e6));
 
-            printf("%lld L2 cache misses (%.3lf%% misses) in %lld cycles\n",
-                   counters[1],
-                   (double)counters[1] / (double)counters[2] * 100,
-                   counters[0] );
+//            printf("%lld L2 cache misses (%.3lf%% misses) in %lld cycles\n",
+//                   counters[1],
+//                   (double)counters[1] / (double)counters[2] * 100,
+//                   counters[0] );
         }
 
         free(collideField);
@@ -207,3 +218,4 @@ int main(int argc, char *argv[])
 }
 
 #endif
+

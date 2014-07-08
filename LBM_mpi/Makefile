@@ -11,7 +11,7 @@ CFLAGS=-pedantic -Wall -std=gnu99 -fopenmp -Ofast -msse3 -funroll-loops -g $(PAP
 
 # Linker flags
 # ------------
-LDFLAGS=-lpapi -fopenmp $(PAPI_LIB)
+LDFLAGS= -fopenmp $(PAPI_LIB)
 OBJECTS=$(SOURCES:.c=.o)
 EXECUTABLE=lbsim
 
