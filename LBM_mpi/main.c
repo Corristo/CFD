@@ -12,7 +12,7 @@
 #include <unistd.h>
 #include <omp.h>
 #include <sys/time.h>
-#include <papi.h>
+//#include <papi.h>
 
 int main(int argc, char *argv[])
 {
@@ -25,15 +25,15 @@ int main(int argc, char *argv[])
     double time_spent;
     struct timeval time_start, time_end;
 
-    long long counters[3];
-    int PAPI_events[] =
-    {
-        PAPI_TOT_CYC,
-        PAPI_L2_DCM,
-        PAPI_L2_DCA
-    };
-
-    PAPI_library_init(PAPI_VER_CURRENT);
+//    long long counters[3];
+//    int PAPI_events[] =
+//    {
+//        PAPI_TOT_CYC,
+//        PAPI_L2_DCM,
+//        PAPI_L2_DCA
+//    };
+//
+//    PAPI_library_init(PAPI_VER_CURRENT);
 
     int xlength[3], local_xlength[3], timesteps, timestepsPerPlotting;
     double tau, bddParams[7];
@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
     MPI_Init( &argc, &argv );
     MPI_Comm_size( MPI_COMM_WORLD, &number_of_ranks );      /* asking for the number of processes  */
     MPI_Comm_rank( MPI_COMM_WORLD, &rank );                 /* asking for the local process id   */
- 
+
     MPI_File fh;
     int err = MPI_File_open( MPI_COMM_WORLD, "VTK.bin.data", MPI_MODE_RDWR | MPI_MODE_CREATE, MPI_INFO_NULL, &fh );
     if (err) {
@@ -94,44 +94,68 @@ int main(int argc, char *argv[])
         initialiseMPITypes(local_xlength, neighbours, flagField, MPISendTypes, MPIRecvTypes);
 
 
+#ifndef _NOPROGRESS_
         if (!rank)
             printf("Progress:     ");
-        PAPI_start_counters( PAPI_events, 3 );
+#endif // _NOPROGRESS_
+//        PAPI_start_counters( PAPI_events, 3 );
         for(int t = 0; t < timesteps; t++)
         {
             double *swap = NULL;
 
 
             communicateBoundaryValues( MPISendTypes, MPIRecvTypes, collideField, neighbours, MPISendReq, MPIRecvReq, 0); // communicate along x - axis (right to left - left to right)
+#ifdef _AVX_
+            doStreamingAndCollisionAVX(collideField, streamField, flagField, local_xlength, tau, 1);
+#else
             doStreamingAndCollision(collideField, streamField, flagField, local_xlength, tau, 1);
+#endif // _AVX_
             checkRequestCompletion(MPISendReq, MPIRecvReq, 0, neighbours);
 
             communicateBoundaryValues( MPISendTypes, MPIRecvTypes, collideField, neighbours, MPISendReq, MPIRecvReq, 2); // communicate along z - axis (back to front - front to back)
+#ifdef _AVX_
+            doStreamingAndCollisionAVX(collideField, streamField, flagField, local_xlength, tau, 2);
+#else
             doStreamingAndCollision(collideField, streamField, flagField, local_xlength, tau, 2);
+#endif // _AVX_
             checkRequestCompletion(MPISendReq, MPIRecvReq, 2, neighbours);
 
             communicateBoundaryValues( MPISendTypes, MPIRecvTypes, collideField, neighbours, MPISendReq, MPIRecvReq, 1); // communicate along y - axis (bottom to top - top to bottom)
+#ifdef _AVX_
+            doStreamingAndCollisionAVX(collideField, streamField, flagField, local_xlength, tau, 3);
+#else
             doStreamingAndCollision(collideField, streamField, flagField, local_xlength, tau, 3);
+#endif // _AVX_
             checkRequestCompletion(MPISendReq, MPIRecvReq, 1, neighbours);
 
+#ifdef _AVX_
+            doStreamingAndCollisionAVX(collideField, streamField, flagField, local_xlength, tau, 4);
+#else
             doStreamingAndCollision(collideField, streamField, flagField, local_xlength, tau, 4);
+#endif // _AVX_
 
             swap = collideField;
             collideField = streamField;
             streamField = swap;
 
             treatBoundary(collideField, flagField, bddParams, local_xlength);
-
+#ifdef _VTK_
             if (t % timestepsPerPlotting == 0)
-//                writeVtkOutput(collideField, flagField, "./Paraview/output", (unsigned int) t / timestepsPerPlotting, xlength, local_xlength, rank, iCoord, jCoord, kCoord, iProc, jProc, kProc);
-	          MPI_writeVtkOutput( &fh, collideField, flagField, local_xlength, iCoord, jCoord, kCoord, iProc, jProc, kProc, xlength);		
+#ifdef _MPI_VTK_
+                MPI_writeVtkOutput( &fh, collideField, flagField, local_xlength, iCoord, jCoord, kCoord, iProc, jProc, kProc, xlength);
+#else
+                writeVtkOutput(collideField, flagField, "./Paraview/output", (unsigned int) t / timestepsPerPlotting, xlength, local_xlength, rank, iCoord, jCoord, kCoord, iProc, jProc, kProc);
+#endif // _MPI_VTK_
+#endif // _VTK_
 
+#ifndef _NOPROGRESS_
             if (!rank)
             {
                 int pct = ((float) t / timesteps) * 100;
                 printf("\b\b\b%02d%%", pct);
                 fflush(stdout);
             }
+#endif // _NOPROGRESS_
 
             /** debugging code: check collideField */
 #ifdef _DEBUG_
@@ -180,7 +204,7 @@ int main(int argc, char *argv[])
         MPI_Barrier(MPI_COMM_WORLD);
         if (!rank)
         {
-            PAPI_read_counters( counters, 3 );
+//            PAPI_read_counters( counters, 3 );
             printf("\b\b\b\b100%%\n");
             end = clock();
             time_spent = (double) (end - begin) / CLOCKS_PER_SEC;
@@ -190,10 +214,10 @@ int main(int argc, char *argv[])
             printf("Running time (Wall clock): %.2fs\n", ( (double) (( time_end.tv_sec - time_start.tv_sec) * 1000000u + time_end.tv_usec - time_start.tv_usec) )/ 1e6);
             printf("MLUPS: %.3f\n", ((double) (xlength[0] + 2) * (xlength[1] + 2) * (xlength[2] + 2) * timesteps) / (1000000.0 * ((time_end.tv_sec - time_start.tv_sec) * 1000000u + time_end.tv_usec - time_start.tv_usec) / 1e6));
 
-            printf("%lld L2 cache misses (%.3lf%% misses) in %lld cycles\n",
-                   counters[1],
-                   (double)counters[1] / (double)counters[2] * 100,
-                   counters[0] );
+//            printf("%lld L2 cache misses (%.3lf%% misses) in %lld cycles\n",
+//                   counters[1],
+//                   (double)counters[1] / (double)counters[2] * 100,
+//                   counters[0] );
         }
 
         free(collideField);

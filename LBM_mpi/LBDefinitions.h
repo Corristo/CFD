@@ -11,10 +11,12 @@
 #define PARALLEL_BOUNDARY 7
 #include <stdint.h>
 
-//#define _AVX_
-//#define _ARBITRARYGEOMETRY_
+//#define _AVX_                     // Enables the AVX2 Streaming-and-Collision function which is slower
+#define _ARBITRARYGEOMETRY_       // Enables support for scenarios of worksheet 3
 //#define _DEBUG_
-
+//#define _NOPROGRESS_              // Disables the output of progress information
+#define _VTK_                       // Enables the output of VTK files
+#define _MPI_VTK_                   // Instead of VTK files create a single binary file
 static const int VELOCITIESRIGHTOUT[5] = { 3, 7, 13, 17, 10 };
 static const int VELOCITIESLEFTOUT[5] = { 1, 5, 11, 15, 8 };
 static const int VELOCITIESBOTTOMOUT[5] = { 0, 5, 7, 14, 6 };
